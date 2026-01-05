@@ -1,0 +1,21 @@
+{
+  "quality": {
+    "auc_roc": 0.6772087388361567,
+    "precision_at_100": 1.0,
+    "precision_at_1000": 0.614,
+    "separation": 0.3887512543683157,
+    "best_f1": 0.5404716379859783,
+    "best_threshold": 0.1,
+    "mean_pos_sim": 0.12215237327810184,
+    "mean_neg_sim": 0.011210278078494765,
+    "std_pos_sim": 0.194239021921116,
+    "std_neg_sim": 0.09114165251812778
+  },
+  "efficiency": {
+    "encoding_speed": 5431.36612197443,
+    "vector_bytes": 512,
+    "vector_dimensions": 128,
+    "comparison_speed": 1177839.6723051597,
+    "total_encoding_time_ms": 92.05787066665987
+  }
+}
