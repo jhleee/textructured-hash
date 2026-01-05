@@ -39,7 +39,7 @@ ENV/
 *.ipynb_checkpoints
 
 # Data files (too large for git)
-data/*.jsonl
+# data/*.jsonl  # Commented out to include dataset for reproducibility
 data/*.csv
 data/*.parquet
 
