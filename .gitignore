@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data files (too large for git)
+# data/*.jsonl  # Commented out to include dataset for reproducibility
+data/*.csv
+data/*.parquet
+
+# Model files
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.h5
+*.pt
+*.pth
+
+# Results (keep structure, but not large files)
+results/**/weights.npy
+results/**/*.pkl
+results/**/*.npz
+
+# Profiling
+*.prof
+*.stats
+profile.stats
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

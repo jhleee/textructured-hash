@@ -1,0 +1,4 @@
+dim: 128
+model: simhash
+params:
+  ngram_size: 3
