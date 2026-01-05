@@ -12,6 +12,7 @@ from src.encoders.random_projection import RandomProjectionEncoder
 from src.encoders.simhash import SimHashEncoder
 from src.encoders.minhash import MinHashEncoder
 from src.encoders.tfidf_svd import TfidfSvdEncoder
+from src.encoders.proposed.multiscale import MultiScaleEncoder
 from src.evaluation.metrics import evaluate, benchmark_efficiency
 
 
@@ -44,6 +45,8 @@ def get_encoder(model_name: str, train_pairs=None):
             train_texts = list(set(train_texts))
             encoder.fit(train_texts)
         return encoder
+    elif model_name == 'multiscale':
+        return MultiScaleEncoder(dim=128, seed=42)
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -120,7 +123,7 @@ def save_report(output_dir: Path, model_name: str, config: dict, quality_metrics
 def main():
     parser = argparse.ArgumentParser(description='Evaluate encoder')
     parser.add_argument('--model', type=str, required=True,
-                        choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd'],
+                        choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale'],
                         help='Model name')
     parser.add_argument('--test', type=str, default='data/test.jsonl',
                         help='Test data file')
