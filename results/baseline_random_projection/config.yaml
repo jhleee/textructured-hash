@@ -1,0 +1,5 @@
+dim: 128
+model: random_projection
+params:
+  input_dim: 1024
+  seed: 42
