@@ -1,0 +1,7 @@
+dim: 128
+model: tfidf_svd
+params:
+  max_features: 10000
+  ngram_range: !!python/tuple
+  - 2
+  - 4
