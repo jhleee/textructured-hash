@@ -166,9 +166,9 @@ class MultiScaleEncoder(BaseEncoder):
 
     def _extract_pattern_features(self, text: str) -> np.ndarray:
         """
-        Scale 4: Structural pattern features
+        Scale 4: Statistical pattern features (no hardcoded patterns)
 
-        반복, 엔트로피, 구조적 패턴
+        반복, 엔트로피, 구조적 패턴 (통계적 방법만 사용)
         """
         features = np.zeros(self.sub_dim, dtype=np.float32)
 
@@ -194,24 +194,51 @@ class MultiScaleEncoder(BaseEncoder):
 
             features[3] = entropy / 8.0  # Normalized by max entropy
 
-        # Feature 5-8: Repetition patterns
+        # Feature 5-8: N-gram diversity (statistical patterns)
         if len(text) >= 2:
-            # Character bigram repetition
+            # Character bigram diversity
             bigrams = [text[i:i+2] for i in range(len(text)-1)]
             if bigrams:
                 features[5] = len(set(bigrams)) / len(bigrams)
 
-        # Feature 9-12: Structure indicators
-        features[9] = 1.0 if text.startswith('http') else 0.0
-        features[10] = 1.0 if '@' in text else 0.0
-        features[11] = 1.0 if any(c in '{}[]' for c in text) else 0.0
-        features[12] = 1.0 if any(c in '<>' for c in text) else 0.0
+        if len(text) >= 3:
+            # Character trigram diversity
+            trigrams = [text[i:i+3] for i in range(len(text)-2)]
+            if trigrams:
+                features[6] = len(set(trigrams)) / len(trigrams)
 
-        # Feature 13-15: Numeric patterns
+        # Feature 7-8: Character transition entropy
+        if len(text) >= 2:
+            transitions = {}
+            for i in range(len(text)-1):
+                pair = (text[i], text[i+1])
+                transitions[pair] = transitions.get(pair, 0) + 1
+
+            if transitions:
+                total = sum(transitions.values())
+                trans_entropy = 0
+                for count in transitions.values():
+                    p = count / total
+                    trans_entropy -= p * np.log2(p + 1e-10)
+                features[7] = trans_entropy / 10.0
+
+        # Feature 9-12: Character position statistics
+        if len(text) > 0:
+            # First character properties
+            first_char = text[0]
+            features[9] = 1.0 if first_char.isupper() else 0.0
+            features[10] = 1.0 if first_char.isdigit() else 0.0
+
+            # Last character properties
+            last_char = text[-1]
+            features[11] = 1.0 if last_char.isalpha() else 0.0
+            features[12] = 1.0 if last_char in '.,;:!?' else 0.0
+
+        # Feature 13-15: Numeric and special character statistics
         if len(text) > 0:
             features[13] = sum(c.isdigit() for c in text) / len(text)
-            features[14] = 1.0 if '.' in text and any(c.isdigit() for c in text) else 0.0
-            features[15] = 1.0 if ',' in text and any(c.isdigit() for c in text) else 0.0
+            features[14] = sum(c in '.,;:!?' for c in text) / len(text)
+            features[15] = sum(c in '()[]{}' for c in text) / len(text)
 
         return features
 

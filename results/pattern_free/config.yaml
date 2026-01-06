@@ -1,0 +1,3 @@
+dim: 128
+model: pattern_free
+params: {}

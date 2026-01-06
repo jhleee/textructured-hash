@@ -17,6 +17,7 @@ from src.encoders.proposed.structure_type import StructureTypeEncoder
 from src.encoders.proposed.structure_type_fast import StructureTypeFastEncoder
 from src.encoders.proposed.structure_type_quantized import QuantizedEncoder, QuantizedStructureTypeCompactEncoder
 from src.encoders.proposed.ngram_hash import NgramHashEncoder, NgramHashMultiscaleEncoder
+from src.encoders.proposed.pattern_free import PatternFreeEncoder
 from src.evaluation.metrics import evaluate, benchmark_efficiency
 
 
@@ -81,6 +82,8 @@ def get_encoder(model_name: str, train_pairs=None):
             train_texts = list(set(train_texts))
             encoder.fit(train_texts)
         return encoder
+    elif model_name == 'pattern_free':
+        return PatternFreeEncoder(dim=128, seed=42)
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -160,7 +163,7 @@ def main():
                         choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale',
                                  'structure_type', 'structure_type_fast',
                                  'structure_type_quantized', 'structure_type_quantized_256',
-                                 'ngram_hash', 'ngram_hash_multiscale'],
+                                 'ngram_hash', 'ngram_hash_multiscale', 'pattern_free'],
                         help='Model name')
     parser.add_argument('--test', type=str, default='data/test.jsonl',
                         help='Test data file')
