@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clipboard Manager</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <h1>Clipboard Manager</h1>
+      <div class="header-controls">
+        <input type="text" id="search" placeholder="Search clipboard items..." />
+        <button id="settings-btn">Settings</button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="sidebar">
+        <h2>Clusters</h2>
+        <div id="clusters-list"></div>
+      </div>
+
+      <div class="items-view">
+        <div class="view-controls">
+          <button id="view-all" class="active">All Items</button>
+          <button id="view-clusters">By Clusters</button>
+        </div>
+        <div id="items-container"></div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Settings</h2>
+        <div class="settings-form">
+          <label>
+            Max Items:
+            <input type="number" id="max-items" min="100" max="10000" value="1000" />
+          </label>
+          <label>
+            Similarity Threshold:
+            <input type="range" id="similarity-threshold" min="0" max="1" step="0.05" value="0.7" />
+            <span id="threshold-value">0.7</span>
+          </label>
+          <label>
+            Favorite Priority Boost:
+            <input type="range" id="priority-boost" min="1" max="5" step="0.5" value="2.0" />
+            <span id="boost-value">2.0</span>
+          </label>
+          <button id="save-settings">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

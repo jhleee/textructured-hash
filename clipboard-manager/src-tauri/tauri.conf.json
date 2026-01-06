@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0",
+  "productName": "Clipboard Manager",
+  "version": "1.0.0",
+  "identifier": "com.clipboard.manager",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"]
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Clipboard Manager",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
