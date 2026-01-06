@@ -1,76 +1,43 @@
-"""Structure Type Detection Encoder (Experiment 1.2)
+"""Statistical Structure Encoder (Experiment 1.2 - Pattern-Free Version)
 
-Multi-type structure-aware encoding with conditional feature extraction.
+Multi-scale statistical encoding without hardcoded patterns.
+Removed all regex patterns for better generalization to unseen data formats.
 """
 
 import numpy as np
-import re
 import unicodedata
 from ..base import BaseEncoder
 
 
 class StructureTypeEncoder(BaseEncoder):
     """
-    Experiment 1.2: Structure Type Detection + Conditional Encoding
+    Experiment 1.2 (Pattern-Free): Statistical Structure Encoding
 
-    Hypothesis: Detecting text structure types first, then applying type-specific
-    encoding will increase separation between different types.
+    REMOVED: Hardcoded regex patterns for URL, email, JSON, etc.
 
-    Expected improvement:
-    - Separation: 1.21 → 2.8+ (type separation effect)
-    - Mean Neg Sim: Lower due to type vector differences
+    NEW APPROACH: Pure statistical features for generalization
+    - No pattern matching, no type detection
+    - Statistical features only: byte distribution, unicode categories, n-grams
+    - Better generalization to unknown/unstructured data formats
+
+    Trade-off:
+    - Lower accuracy on known structured types
+    - Better robustness to format variations
+    - No maintenance overhead for pattern updates
     """
-
-    # Structure type patterns (ordered by specificity)
-    PATTERNS = {
-        'url': r'^https?://|^ftp://|^www\.',
-        'email': r'^[\w\.-]+@[\w\.-]+\.\w+$',
-        'json': r'^\s*[\{\[].*[\}\]]\s*$',
-        'xml': r'^\s*<\w+',
-        'html': r'<!DOCTYPE|<html|<body|<div|<span|<p>',
-        'filepath_win': r'^[A-Z]:\\',
-        'filepath_unix': r'^/[a-z]',
-        'ipv4': r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
-        'ipv6': r'^[0-9a-fA-F:]+::[0-9a-fA-F:]*',
-        'phone': r'^\+?\d[\d\-\s\(\)]{7,}$',
-        'hash_md5': r'^[a-fA-F0-9]{32}$',
-        'hash_sha': r'^[a-fA-F0-9]{40,64}$',
-        'uuid': r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$',
-        'base64': r'^[A-Za-z0-9+/]{20,}={0,2}$',
-        'date_iso': r'^\d{4}-\d{2}-\d{2}',
-        'time': r'\d{1,2}:\d{2}(:\d{2})?',
-        'code_function': r'(function|def|class|const|let|var)\s+\w+',
-        'code_control': r'(if|for|while|switch|try)\s*\(',
-        'sql': r'(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\s+',
-        'csv': r'^[\w,]+,[\w,]+',
-        'korean': r'[\uAC00-\uD7AF]{3,}',
-        'japanese': r'[\u3040-\u309F\u30A0-\u30FF]{3,}',
-        'chinese': r'[\u4E00-\u9FFF]{3,}',
-    }
-
-    # Type ID mapping
-    TYPE_IDS = {
-        'url': 0, 'email': 1, 'json': 2, 'xml': 3, 'html': 4,
-        'filepath_win': 5, 'filepath_unix': 6, 'ipv4': 7, 'ipv6': 8,
-        'phone': 9, 'hash_md5': 10, 'hash_sha': 11, 'uuid': 12,
-        'base64': 13, 'date_iso': 14, 'time': 15,
-        'code_function': 16, 'code_control': 17, 'sql': 18, 'csv': 19,
-        'korean': 20, 'japanese': 21, 'chinese': 22,
-        'text': 23  # default
-    }
 
     def __init__(self, dim: int = 128, type_dim: int = 16, seed: int = 42):
         """
         Args:
             dim: Total output vector dimension
-            type_dim: Dimensions allocated for type encoding (one-hot style)
+            type_dim: Dimensions for statistical signature (replaces type encoding)
             seed: Random seed for reproducibility
         """
         if dim <= type_dim:
             raise ValueError(f"dim ({dim}) must be larger than type_dim ({type_dim})")
 
         self._dim = dim
-        self.type_dim = type_dim
+        self.type_dim = type_dim  # Now used for statistical signature
         self.content_dim = dim - type_dim
 
         np.random.seed(seed)
@@ -83,41 +50,58 @@ class StructureTypeEncoder(BaseEncoder):
     def dim(self) -> int:
         return self._dim
 
-    def detect_type(self, text: str) -> str:
+    def _encode_statistical_signature(self, text: str) -> np.ndarray:
         """
-        Detect structure type using regex patterns.
+        Encode statistical signature instead of hardcoded type detection.
 
-        Returns type name (e.g., 'url', 'email', 'json', 'text')
+        Uses character-level statistics to create a signature vector.
+        No pattern matching - purely statistical.
         """
-        # Try each pattern in order
-        for type_name, pattern in self.PATTERNS.items():
-            if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
-                return type_name
+        features = np.zeros(self.type_dim, dtype=np.float32)
 
-        return 'text'  # default fallback
+        if len(text) == 0:
+            return features
 
-    def _encode_type_vector(self, type_name: str) -> np.ndarray:
-        """
-        Encode type as a sparse one-hot-like vector.
+        # Statistical features that capture text "type" without hardcoding
+        # Feature 0-3: Character class ratios
+        features[0] = sum(c.isalpha() for c in text) / len(text)
+        features[1] = sum(c.isdigit() for c in text) / len(text)
+        features[2] = sum(c.isspace() for c in text) / len(text)
+        features[3] = sum(c in '.,;:!?' for c in text) / len(text)
 
-        Uses distributed representation to allow some similarity between related types.
-        """
-        type_id = self.TYPE_IDS.get(type_name, self.TYPE_IDS['text'])
+        # Feature 4-7: Special character ratios
+        features[4] = sum(c in '()[]{}' for c in text) / len(text)
+        features[5] = sum(c in '<>/' for c in text) / len(text)
+        features[6] = sum(c in '@#$%&*' for c in text) / len(text)
+        features[7] = sum(c in '+-=|\\' for c in text) / len(text)
 
-        # Create one-hot vector
-        type_vec = np.zeros(self.type_dim, dtype=np.float32)
-        type_vec[type_id % self.type_dim] = 1.0
+        # Feature 8-10: Case statistics
+        alpha_count = sum(c.isalpha() for c in text)
+        if alpha_count > 0:
+            features[8] = sum(c.isupper() for c in text) / alpha_count
+            features[9] = sum(c.islower() for c in text) / alpha_count
 
-        # Add small noise to related types for smoother boundaries
-        if type_id + 1 < self.type_dim:
-            type_vec[(type_id + 1) % self.type_dim] = 0.1
+        # Feature 10-11: Character diversity
+        features[10] = len(set(text)) / min(len(text), 256)
+        features[11] = len(set(text)) / 256.0
+
+        # Feature 12-13: Position features
+        features[12] = 1.0 if text[0].isupper() else 0.0
+        features[13] = 1.0 if text[0].isdigit() else 0.0
+
+        # Feature 14-15: Length features
+        features[14] = min(len(text) / 1000.0, 1.0)
+        if len(text) >= 2:
+            # Bigram diversity
+            bigrams = [text[i:i+2] for i in range(len(text)-1)]
+            features[15] = len(set(bigrams)) / len(bigrams)
 
         # L2 normalize
-        norm = np.linalg.norm(type_vec)
+        norm = np.linalg.norm(features)
         if norm > 1e-10:
-            type_vec = type_vec / norm
+            features = features / norm
 
-        return type_vec
+        return features
 
     def _encode_content_byte_level(self, text: str) -> np.ndarray:
         """Extract byte-level content features."""
@@ -221,59 +205,73 @@ class StructureTypeEncoder(BaseEncoder):
 
         return features
 
-    def _encode_content_structural(self, text: str, type_name: str) -> np.ndarray:
-        """Extract type-specific structural features."""
+    def _encode_content_structural(self, text: str) -> np.ndarray:
+        """
+        Extract statistical structural features (no type-specific logic).
+
+        Replaces hardcoded type-specific features with general statistical patterns.
+        """
         dim = self.content_dim // 4
         features = np.zeros(dim, dtype=np.float32)
 
-        # URL-specific features
-        if type_name == 'url':
-            features[0] = 1.0 if 'https://' in text else 0.5 if 'http://' in text else 0.0
-            features[1] = text.count('/') / max(len(text), 1)
-            features[2] = text.count('?') / max(len(text), 1)
-            features[3] = text.count('&') / max(len(text), 1)
+        if len(text) == 0:
+            return features
 
-        # Email-specific features
-        elif type_name == 'email':
-            features[0] = 1.0
-            features[1] = text.count('@') / max(len(text), 1)
-            features[2] = text.count('.') / max(len(text), 1)
+        # General character frequency features (no type assumptions)
+        features[0] = text.count('/') / max(len(text), 1)
+        features[1] = text.count('.') / max(len(text), 1)
+        features[2] = text.count('@') / max(len(text), 1)
+        features[3] = text.count(':') / max(len(text), 1)
 
-        # JSON/structured data features
-        elif type_name in ['json', 'xml', 'html']:
-            features[0] = text.count('{') / max(len(text), 1)
-            features[1] = text.count('[') / max(len(text), 1)
-            features[2] = text.count('<') / max(len(text), 1)
-            features[3] = text.count(':') / max(len(text), 1)
+        if dim > 4:
+            features[4] = text.count('{') / max(len(text), 1)
+            features[5] = text.count('[') / max(len(text), 1)
+            features[6] = text.count('<') / max(len(text), 1)
+            features[7] = text.count('(') / max(len(text), 1)
 
-        # Code-specific features
-        elif 'code' in type_name:
-            features[0] = text.count('(') / max(len(text), 1)
-            features[1] = text.count(';') / max(len(text), 1)
-            features[2] = text.count('=') / max(len(text), 1)
+        if dim > 8:
+            features[8] = text.count(';') / max(len(text), 1)
+            features[9] = text.count('=') / max(len(text), 1)
+            features[10] = text.count('?') / max(len(text), 1)
+            features[11] = text.count('&') / max(len(text), 1)
+
+        # Statistical patterns (not type-specific)
+        if dim > 12:
+            # Character transition entropy
+            if len(text) >= 2:
+                transitions = {}
+                for i in range(len(text)-1):
+                    pair = (text[i], text[i+1])
+                    transitions[pair] = transitions.get(pair, 0) + 1
+
+                if transitions:
+                    total = sum(transitions.values())
+                    entropy = 0
+                    for count in transitions.values():
+                        p = count / total
+                        entropy -= p * np.log2(p + 1e-10)
+                    features[12] = entropy / 10.0
 
         return features
 
     def encode(self, text: str) -> np.ndarray:
         """
-        Encode text with structure type awareness.
+        Encode text with statistical features (no pattern matching).
 
-        1. Detect structure type
-        2. Encode type as type_vector (16 dims)
-        3. Extract type-aware content features (112 dims)
-        4. Concatenate and normalize
+        1. Extract statistical signature (replaces type detection)
+        2. Extract multi-scale content features
+        3. Concatenate and normalize
+
+        NO hardcoded patterns, NO regex, NO type detection.
         """
-        # Detect type
-        type_name = self.detect_type(text)
-
-        # Encode type vector
-        type_vec = self._encode_type_vector(type_name)
+        # Statistical signature (replaces type vector)
+        stat_sig = self._encode_statistical_signature(text)
 
         # Extract content features (4 parts)
         byte_vec = self._encode_content_byte_level(text)
         unicode_vec = self._encode_content_unicode_level(text)
         char_stats_vec = self._encode_content_char_stats(text)
-        structural_vec = self._encode_content_structural(text, type_name)
+        structural_vec = self._encode_content_structural(text)
 
         # Concatenate all parts
         content_vec = np.concatenate([byte_vec, unicode_vec, char_stats_vec, structural_vec])
@@ -285,8 +283,8 @@ class StructureTypeEncoder(BaseEncoder):
             padding = np.zeros(self.content_dim - len(content_vec), dtype=np.float32)
             content_vec = np.concatenate([content_vec, padding])
 
-        # Combine type and content
-        vec = np.concatenate([type_vec, content_vec])
+        # Combine statistical signature and content
+        vec = np.concatenate([stat_sig, content_vec])
 
         # L2 normalization
         norm = np.linalg.norm(vec)
