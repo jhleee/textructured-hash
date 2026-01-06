@@ -1,10 +1,9 @@
-"""Numba-accelerated Structure Type Encoder (Experiment 2.1)
+"""Numba-accelerated Statistical Encoder (Experiment 2.1 - Pattern-Free)
 
-JIT-compiled version for improved encoding speed.
+JIT-compiled version with hardcoded patterns removed for better generalization.
 """
 
 import numpy as np
-import re
 import unicodedata
 from numba import jit
 from ..base import BaseEncoder
@@ -152,57 +151,26 @@ def project_vector_fast(sparse_vec, projection_matrix):
 
 class StructureTypeFastEncoder(BaseEncoder):
     """
-    Experiment 2.1: Numba JIT-accelerated Structure Type Encoder
+    Experiment 2.1 (Pattern-Free): Numba JIT-accelerated Statistical Encoder
 
-    Hypothesis: JIT compilation of hot loops will achieve 2-5x speed improvement.
+    REMOVED: All hardcoded regex patterns (23 patterns removed)
 
-    Expected improvement:
-    - Speed: 9,340/s → 20,000+/s
-    - Quality: Same as StructureTypeEncoder (no degradation)
+    NEW APPROACH: Pure statistical features with JIT acceleration
+    - No pattern matching, no type detection
+    - JIT-compiled statistical feature extraction
+    - Better generalization to unknown data formats
+
+    Expected trade-off:
+    - Speed: Still fast with JIT (6,000-8,000/s)
+    - Quality: Slightly lower on known types, better on unknown types
+    - Generalization: Significantly improved
     """
-
-    # Structure type patterns (same as original)
-    PATTERNS = {
-        'url': r'^https?://|^ftp://|^www\.',
-        'email': r'^[\w\.-]+@[\w\.-]+\.\w+$',
-        'json': r'^\s*[\{\[].*[\}\]]\s*$',
-        'xml': r'^\s*<\w+',
-        'html': r'<!DOCTYPE|<html|<body|<div|<span|<p>',
-        'filepath_win': r'^[A-Z]:\\',
-        'filepath_unix': r'^/[a-z]',
-        'ipv4': r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
-        'ipv6': r'^[0-9a-fA-F:]+::[0-9a-fA-F:]*',
-        'phone': r'^\+?\d[\d\-\s\(\)]{7,}$',
-        'hash_md5': r'^[a-fA-F0-9]{32}$',
-        'hash_sha': r'^[a-fA-F0-9]{40,64}$',
-        'uuid': r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$',
-        'base64': r'^[A-Za-z0-9+/]{20,}={0,2}$',
-        'date_iso': r'^\d{4}-\d{2}-\d{2}',
-        'time': r'\d{1,2}:\d{2}(:\d{2})?',
-        'code_function': r'(function|def|class|const|let|var)\s+\w+',
-        'code_control': r'(if|for|while|switch|try)\s*\(',
-        'sql': r'(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\s+',
-        'csv': r'^[\w,]+,[\w,]+',
-        'korean': r'[\uAC00-\uD7AF]{3,}',
-        'japanese': r'[\u3040-\u309F\u30A0-\u30FF]{3,}',
-        'chinese': r'[\u4E00-\u9FFF]{3,}',
-    }
-
-    TYPE_IDS = {
-        'url': 0, 'email': 1, 'json': 2, 'xml': 3, 'html': 4,
-        'filepath_win': 5, 'filepath_unix': 6, 'ipv4': 7, 'ipv6': 8,
-        'phone': 9, 'hash_md5': 10, 'hash_sha': 11, 'uuid': 12,
-        'base64': 13, 'date_iso': 14, 'time': 15,
-        'code_function': 16, 'code_control': 17, 'sql': 18, 'csv': 19,
-        'korean': 20, 'japanese': 21, 'chinese': 22,
-        'text': 23
-    }
 
     def __init__(self, dim: int = 128, type_dim: int = 16, seed: int = 42):
         """
         Args:
             dim: Total output vector dimension
-            type_dim: Dimensions for type encoding
+            type_dim: Dimensions for statistical signature
             seed: Random seed
         """
         if dim <= type_dim:
@@ -226,43 +194,64 @@ class StructureTypeFastEncoder(BaseEncoder):
     def dim(self) -> int:
         return self._dim
 
-    def detect_type(self, text: str) -> str:
-        """Detect structure type using regex patterns."""
-        for type_name, pattern in self.PATTERNS.items():
-            if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
-                return type_name
-        return 'text'
+    def _encode_statistical_signature(self, text: str) -> np.ndarray:
+        """
+        Encode statistical signature (replaces type detection).
 
-    def _encode_type_vector(self, type_name: str) -> np.ndarray:
-        """Encode type as sparse one-hot vector."""
-        type_id = self.TYPE_IDS.get(type_name, self.TYPE_IDS['text'])
+        Uses character-level statistics without any pattern matching.
+        """
+        features = np.zeros(self.type_dim, dtype=np.float32)
 
-        type_vec = np.zeros(self.type_dim, dtype=np.float32)
-        type_vec[type_id % self.type_dim] = 1.0
+        if len(text) == 0:
+            return features
 
-        # Add small noise to related types
-        if type_id + 1 < self.type_dim:
-            type_vec[(type_id + 1) % self.type_dim] = 0.1
+        # Statistical features (no hardcoded patterns)
+        features[0] = sum(c.isalpha() for c in text) / len(text)
+        features[1] = sum(c.isdigit() for c in text) / len(text)
+        features[2] = sum(c.isspace() for c in text) / len(text)
+        features[3] = sum(c in '.,;:!?' for c in text) / len(text)
+
+        features[4] = sum(c in '()[]{}' for c in text) / len(text)
+        features[5] = sum(c in '<>/' for c in text) / len(text)
+        features[6] = sum(c in '@#$%&*' for c in text) / len(text)
+        features[7] = sum(c in '+-=|\\' for c in text) / len(text)
+
+        alpha_count = sum(c.isalpha() for c in text)
+        if alpha_count > 0:
+            features[8] = sum(c.isupper() for c in text) / alpha_count
+            features[9] = sum(c.islower() for c in text) / alpha_count
+
+        features[10] = len(set(text)) / min(len(text), 256)
+        features[11] = len(set(text)) / 256.0
+
+        features[12] = 1.0 if text[0].isupper() else 0.0
+        features[13] = 1.0 if text[0].isdigit() else 0.0
+
+        features[14] = min(len(text) / 1000.0, 1.0)
+        if len(text) >= 2:
+            bigrams = [text[i:i+2] for i in range(len(text)-1)]
+            features[15] = len(set(bigrams)) / len(bigrams)
 
         # L2 normalize
-        norm = np.linalg.norm(type_vec)
+        norm = np.linalg.norm(features)
         if norm > 1e-10:
-            type_vec = type_vec / norm
+            features = features / norm
 
-        return type_vec
+        return features
 
     def encode(self, text: str) -> np.ndarray:
         """
-        Encode text with JIT-accelerated feature extraction.
+        Encode text with JIT-accelerated statistical features.
 
-        1. Detect type (regex, not JIT-able)
+        1. Extract statistical signature (no pattern matching)
         2. Extract byte features (JIT)
         3. Extract char stats (JIT)
         4. Project and combine
+
+        NO hardcoded patterns, NO type detection.
         """
-        # Detect type
-        type_name = self.detect_type(text)
-        type_vec = self._encode_type_vector(type_name)
+        # Statistical signature (replaces type detection)
+        stat_sig = self._encode_statistical_signature(text)
 
         # Convert text to bytes and char array for JIT functions
         try:
@@ -291,8 +280,8 @@ class StructureTypeFastEncoder(BaseEncoder):
             padding = np.zeros(self.content_dim - len(content_vec), dtype=np.float32)
             content_vec = np.concatenate([content_vec, padding])
 
-        # Combine type and content
-        vec = np.concatenate([type_vec, content_vec])
+        # Combine statistical signature and content
+        vec = np.concatenate([stat_sig, content_vec])
 
         # L2 normalization
         norm = np.linalg.norm(vec)
