@@ -13,6 +13,10 @@ from src.encoders.simhash import SimHashEncoder
 from src.encoders.minhash import MinHashEncoder
 from src.encoders.tfidf_svd import TfidfSvdEncoder
 from src.encoders.proposed.multiscale import MultiScaleEncoder
+from src.encoders.proposed.structure_type import StructureTypeEncoder
+from src.encoders.proposed.structure_type_fast import StructureTypeFastEncoder
+from src.encoders.proposed.structure_type_quantized import QuantizedEncoder, QuantizedStructureTypeCompactEncoder
+from src.encoders.proposed.ngram_hash import NgramHashEncoder, NgramHashMultiscaleEncoder
 from src.evaluation.metrics import evaluate, benchmark_efficiency
 
 
@@ -47,6 +51,36 @@ def get_encoder(model_name: str, train_pairs=None):
         return encoder
     elif model_name == 'multiscale':
         return MultiScaleEncoder(dim=128, seed=42)
+    elif model_name == 'structure_type':
+        return StructureTypeEncoder(dim=128, type_dim=16, seed=42)
+    elif model_name == 'structure_type_fast':
+        return StructureTypeFastEncoder(dim=128, type_dim=16, seed=42)
+    elif model_name == 'structure_type_quantized':
+        return QuantizedEncoder(dim=128, type_dim=16, seed=42)
+    elif model_name == 'structure_type_quantized_256':
+        return QuantizedStructureTypeCompactEncoder(dim=256, type_dim=32, seed=42)
+    elif model_name == 'ngram_hash':
+        encoder = NgramHashEncoder(dim=128, n_grams=(2, 3, 4), vocab_size=8192, seed=42)
+        # Fit IDF on training data
+        if train_pairs:
+            train_texts = []
+            for pair in train_pairs:
+                train_texts.append(pair['text1'])
+                train_texts.append(pair['text2'])
+            train_texts = list(set(train_texts))
+            encoder.fit(train_texts)
+        return encoder
+    elif model_name == 'ngram_hash_multiscale':
+        encoder = NgramHashMultiscaleEncoder(dim=128, ngram_dim_ratio=0.75, seed=42)
+        # Fit IDF on training data
+        if train_pairs:
+            train_texts = []
+            for pair in train_pairs:
+                train_texts.append(pair['text1'])
+                train_texts.append(pair['text2'])
+            train_texts = list(set(train_texts))
+            encoder.fit(train_texts)
+        return encoder
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -123,7 +157,10 @@ def save_report(output_dir: Path, model_name: str, config: dict, quality_metrics
 def main():
     parser = argparse.ArgumentParser(description='Evaluate encoder')
     parser.add_argument('--model', type=str, required=True,
-                        choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale'],
+                        choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale',
+                                 'structure_type', 'structure_type_fast',
+                                 'structure_type_quantized', 'structure_type_quantized_256',
+                                 'ngram_hash', 'ngram_hash_multiscale'],
                         help='Model name')
     parser.add_argument('--test', type=str, default='data/test.jsonl',
                         help='Test data file')
@@ -148,7 +185,7 @@ def main():
     print(f"Loaded {len(test_pairs)} test pairs")
 
     train_pairs = None
-    if args.model == 'tfidf_svd':
+    if args.model in ['tfidf_svd', 'ngram_hash', 'ngram_hash_multiscale']:
         print(f"\nLoading train data from {args.train}...")
         train_pairs = load_pairs(args.train)
         print(f"Loaded {len(train_pairs)} train pairs")

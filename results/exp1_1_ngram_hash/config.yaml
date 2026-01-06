@@ -1,0 +1,3 @@
+dim: 128
+model: ngram_hash
+params: {}

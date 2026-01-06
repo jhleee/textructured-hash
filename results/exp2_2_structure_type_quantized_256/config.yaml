@@ -1,0 +1,3 @@
+dim: 256
+model: structure_type_quantized_256
+params: {}
