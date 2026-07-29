@@ -383,18 +383,20 @@ class FisherStructureEncoder(BaseEncoder):
             category_texts[cat1].append(pair['text1'])
             category_texts[cat2].append(pair['text2'])
         
-        # Deduplicate per category
+        # Deduplicate in a stable order so training does not depend on
+        # Python's per-process hash randomization.
         for cat in category_texts:
-            category_texts[cat] = list(set(category_texts[cat]))
-        
+            category_texts[cat] = sorted(set(category_texts[cat]))
+
         print(f"  Found {len(category_texts)} categories")
-        
+
         # Extract features for all texts
         all_features = []
         all_labels = []
         cat_to_idx = {cat: i for i, cat in enumerate(sorted(category_texts.keys()))}
-        
-        for cat, texts in category_texts.items():
+
+        for cat in sorted(category_texts):
+            texts = category_texts[cat]
             cat_idx = cat_to_idx[cat]
             for text in texts:
                 feat = self._extract_features(text)
