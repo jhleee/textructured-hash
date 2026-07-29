@@ -1,0 +1,688 @@
+{
+  "config": {
+    "seed": 20260729,
+    "roots_per_family": 30,
+    "models": [
+      "fisher",
+      "generalized"
+    ],
+    "python": "3.11.15",
+    "numpy": "2.4.6",
+    "family_specs": [
+      {
+        "domain": "web_api",
+        "family": "url",
+        "family_ood": false
+      },
+      {
+        "domain": "web_api",
+        "family": "http_request",
+        "family_ood": true
+      },
+      {
+        "domain": "serialization",
+        "family": "json",
+        "family_ood": false
+      },
+      {
+        "domain": "serialization",
+        "family": "yaml_config",
+        "family_ood": true
+      },
+      {
+        "domain": "observability",
+        "family": "app_log",
+        "family_ood": false
+      },
+      {
+        "domain": "observability",
+        "family": "stack_trace",
+        "family_ood": true
+      },
+      {
+        "domain": "code_build",
+        "family": "python_code",
+        "family_ood": false
+      },
+      {
+        "domain": "code_build",
+        "family": "sql",
+        "family_ood": true
+      },
+      {
+        "domain": "identifiers",
+        "family": "filepath",
+        "family_ood": false
+      },
+      {
+        "domain": "identifiers",
+        "family": "semantic_version",
+        "family_ood": true
+      },
+      {
+        "domain": "tables_cli",
+        "family": "csv_table",
+        "family_ood": false
+      },
+      {
+        "domain": "tables_cli",
+        "family": "cli_table",
+        "family_ood": true
+      },
+      {
+        "domain": "business",
+        "family": "datetime",
+        "family_ood": false
+      },
+      {
+        "domain": "business",
+        "family": "invoice",
+        "family_ood": true
+      },
+      {
+        "domain": "documents",
+        "family": "markdown",
+        "family_ood": false
+      },
+      {
+        "domain": "documents",
+        "family": "chat_transcript",
+        "family_ood": true
+      },
+      {
+        "domain": "opaque_encoding",
+        "family": "base64_token",
+        "family_ood": false
+      },
+      {
+        "domain": "opaque_encoding",
+        "family": "jwt_shaped",
+        "family_ood": true
+      },
+      {
+        "domain": "operations",
+        "family": "env_file",
+        "family_ood": false
+      },
+      {
+        "domain": "operations",
+        "family": "cron_entry",
+        "family_ood": true
+      }
+    ],
+    "validation_threshold_frozen": true
+  },
+  "audit": {
+    "records": 1560,
+    "families": 20,
+    "domains": 10,
+    "manifest_sha256": "2f776a48b57d16cae4e0efea611c434290c1ee02bf21acdd380cf7906fdb1a53",
+    "split_counts": {
+      "family_ood": 900,
+      "test": 180,
+      "train": 360,
+      "val": 120
+    },
+    "overlaps": {
+      "family_ood__test": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      },
+      "family_ood__train": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      },
+      "family_ood__val": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      },
+      "test__train": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      },
+      "test__val": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      },
+      "train__val": {
+        "root_overlap": 0,
+        "exact_text_overlap": 0
+      }
+    },
+    "root_and_exact_leakage_free": true,
+    "challenge_isolation": true,
+    "id_renderer_overlap_expected": true,
+    "leakage_free": true,
+    "deterministic_regeneration": true
+  },
+  "models": {
+    "fisher": {
+      "pair_validation": {
+        "pairs": 600,
+        "roc_auc": 0.9999999999999999,
+        "average_precision": 1.0,
+        "f1_at_val_threshold": 1.0,
+        "threshold": 0.6609868854284286,
+        "mean_positive": 0.9990561505158743,
+        "mean_negative": -0.10161428455263376,
+        "separation": 6.607527434855395
+      },
+      "pair_id": {
+        "pairs": 600,
+        "roc_auc": 1.0,
+        "average_precision": 0.9999999999999999,
+        "f1_at_val_threshold": 1.0,
+        "threshold": 0.6609868854284286,
+        "mean_positive": 0.9985601017872493,
+        "mean_negative": -0.08427994793901841,
+        "separation": 6.161061650165752
+      },
+      "pair_template_ood": {
+        "pairs": 600,
+        "roc_auc": 0.9374444444444444,
+        "average_precision": 0.9145887732520483,
+        "f1_at_val_threshold": 0.5620608899297423,
+        "threshold": 0.6609868854284286,
+        "mean_positive": 0.4977673809354504,
+        "mean_negative": -0.07734529552360375,
+        "separation": 1.1345318165912137
+      },
+      "pair_family_ood": {
+        "pairs": 600,
+        "roc_auc": 0.7912222222222223,
+        "average_precision": 0.8248462424078784,
+        "f1_at_val_threshold": 0.45569620253164556,
+        "threshold": 0.6609868854284286,
+        "mean_positive": 0.3987895573675633,
+        "mean_negative": 0.0204877062762777,
+        "separation": 0.6622206152378837
+      },
+      "retrieval_id": {
+        "corpus": 60,
+        "queries": 60,
+        "hit_at_1": 1.0,
+        "hit_at_5": 1.0,
+        "hit_at_10": 1.0,
+        "random_hit_at_10": 0.6825913942712365,
+        "precision_at_10": 0.6000000000000001,
+        "precision_at_min_r_10": 1.0,
+        "random_precision_at_10": 0.09999999999999996,
+        "precision_lift_at_10": 6.000000000000003,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.9999999999999999,
+        "worst_domain_ndcg_at_10": 0.9999999999999999,
+        "per_domain_ndcg_at_10": {
+          "business": 0.9999999999999999,
+          "code_build": 0.9999999999999999,
+          "documents": 0.9999999999999999,
+          "identifiers": 0.9999999999999999,
+          "observability": 0.9999999999999999,
+          "opaque_encoding": 0.9999999999999999,
+          "operations": 0.9999999999999999,
+          "serialization": 0.9999999999999999,
+          "tables_cli": 0.9999999999999999,
+          "web_api": 0.9999999999999999
+        }
+      },
+      "retrieval_template_ood": {
+        "corpus": 60,
+        "queries": 60,
+        "hit_at_1": 0.6,
+        "hit_at_5": 0.6,
+        "hit_at_10": 0.9,
+        "random_hit_at_10": 0.6825913942712365,
+        "precision_at_10": 0.48000000000000015,
+        "precision_at_min_r_10": 0.6,
+        "random_precision_at_10": 0.09999999999999996,
+        "precision_lift_at_10": 4.800000000000003,
+        "recall_at_10": 0.8,
+        "mrr": 0.6505494505494506,
+        "ndcg_at_10": 0.7124676064741813,
+        "worst_domain_ndcg_at_10": 0.0,
+        "per_domain_ndcg_at_10": {
+          "business": 0.9999999999999999,
+          "code_build": 0.3748920215806048,
+          "documents": 0.9999999999999999,
+          "identifiers": 0.3748920215806048,
+          "observability": 0.0,
+          "opaque_encoding": 0.9999999999999999,
+          "operations": 0.9999999999999999,
+          "serialization": 0.9999999999999999,
+          "tables_cli": 0.3748920215806048,
+          "web_api": 0.9999999999999999
+        }
+      },
+      "retrieval_family_ood": {
+        "corpus": 300,
+        "queries": 300,
+        "hit_at_1": 0.6,
+        "hit_at_5": 0.6,
+        "hit_at_10": 0.6,
+        "random_hit_at_10": 0.6572153155740706,
+        "precision_at_10": 0.6,
+        "precision_at_min_r_10": 0.6,
+        "random_precision_at_10": 0.09999999999999999,
+        "precision_lift_at_10": 6.0,
+        "recall_at_10": 0.2,
+        "mrr": 0.6037561681752366,
+        "ndcg_at_10": 0.6,
+        "worst_domain_ndcg_at_10": 0.0,
+        "per_domain_ndcg_at_10": {
+          "business": 1.0,
+          "code_build": 1.0,
+          "documents": 0.0,
+          "identifiers": 1.0,
+          "observability": 1.0,
+          "opaque_encoding": 1.0,
+          "operations": 0.0,
+          "serialization": 1.0,
+          "tables_cli": 0.0,
+          "web_api": 0.0
+        }
+      },
+      "clustering_id": {
+        "samples": 60,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "clustering_template_ood": {
+        "samples": 60,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "clustering_family_ood": {
+        "samples": 300,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "operations": {
+        "triage_macro_f1_id": 1.0,
+        "triage_macro_f1_template_ood": 0.4833333333333333,
+        "family_novelty_samples_known": 60,
+        "family_novelty_samples_unknown": 60,
+        "family_novelty_positive_prevalence": 0.5,
+        "family_novelty_auroc": 1.0,
+        "family_novelty_average_precision": 1.0,
+        "template_shift_auroc": 1.0,
+        "template_shift_average_precision": 1.0,
+        "mean_known_confidence": 0.9994279742240906,
+        "mean_unknown_confidence": 0.5566845536231995
+      },
+      "mutations": {
+        "cases": 300,
+        "errors": 0,
+        "error_examples": [],
+        "mean_similarity": 0.9620703701178233,
+        "p10_similarity": 0.8997001111507417,
+        "by_mutation": {
+          "crlf": 0.9253176579872767,
+          "nfd": 0.9999999751647314,
+          "trailing_space": 0.9767394651969273,
+          "truncated": 0.9292942166328431,
+          "zero_width": 0.9790005356073379
+        }
+      },
+      "performance": {
+        "texts": 160,
+        "throughput_texts_per_sec": 71453.10152703062,
+        "latency_ms_p50": 0.013752000086242333,
+        "latency_ms_p95": 0.014918500573912748,
+        "latency_ms_p99": 0.01652590020967181,
+        "stored_vector_bytes": 256,
+        "evaluation_vector_dtype": "int8",
+        "float_vector_bytes": 1024,
+        "repeat_encode_bit_identical": true,
+        "boundary_errors": 0,
+        "boundary_cases": [
+          {
+            "name": "ascii_0",
+            "length": 0,
+            "latency_ms": 0.014287999874795787,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_1",
+            "length": 1,
+            "latency_ms": 0.014215999726729933,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_16",
+            "length": 16,
+            "latency_ms": 0.013434999345918186,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_256",
+            "length": 256,
+            "latency_ms": 0.015610999980708584,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_4096",
+            "length": 4096,
+            "latency_ms": 0.046410000322794076,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_100000",
+            "length": 100000,
+            "latency_ms": 0.8262040000772686,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_100001",
+            "length": 100001,
+            "latency_ms": 0.8239829994636239,
+            "valid": true,
+            "error": null
+          }
+        ]
+      },
+      "verdict": {
+        "decision": "NO_GO",
+        "decision_basis": "one or more mandatory benchmark gates failed",
+        "bounded_known_format_pilot_eligible": true,
+        "passed": 15,
+        "total": 21,
+        "gates": {
+          "challenge_isolation": true,
+          "repeat_encode_bit_identical": true,
+          "boundary_safe": true,
+          "mutation_safe": true,
+          "storage_lte_256": true,
+          "throughput_gte_10k": true,
+          "id_pair_auc_gte_090": true,
+          "id_pair_fixed_f1_gte_080": true,
+          "family_ood_pair_auc_gte_085": false,
+          "id_retrieval_precision_at_min_r_10_gte_080": true,
+          "id_retrieval_ndcg10_gte_090": true,
+          "id_retrieval_worst_domain_ndcg_gte_075": true,
+          "template_ood_ndcg10_gte_075": false,
+          "template_ood_worst_domain_ndcg_gte_050": false,
+          "family_ood_ndcg10_gte_065": false,
+          "family_ood_worst_domain_ndcg_gte_050": false,
+          "id_clustering_ari_gte_065": true,
+          "family_ood_clustering_ari_gte_050": true,
+          "triage_id_f1_gte_085": true,
+          "triage_template_ood_f1_gte_075": false,
+          "family_novelty_auroc_gte_080": true
+        }
+      }
+    },
+    "generalized": {
+      "pair_validation": {
+        "pairs": 600,
+        "roc_auc": 0.9618333333333333,
+        "average_precision": 0.9579724910636866,
+        "f1_at_val_threshold": 0.9106830122591943,
+        "threshold": 0.3926638066768646,
+        "mean_positive": 0.5037970830996831,
+        "mean_negative": 0.23653720988581578,
+        "separation": 1.1362337866225365
+      },
+      "pair_id": {
+        "pairs": 600,
+        "roc_auc": 0.936888888888889,
+        "average_precision": 0.9284191696585173,
+        "f1_at_val_threshold": 0.8652246256239601,
+        "threshold": 0.3926638066768646,
+        "mean_positive": 0.5010477483272553,
+        "mean_negative": 0.24611473090946676,
+        "separation": 1.0573927979053013
+      },
+      "pair_template_ood": {
+        "pairs": 600,
+        "roc_auc": 0.9061666666666667,
+        "average_precision": 0.8812280371528134,
+        "f1_at_val_threshold": 0.8278145695364238,
+        "threshold": 0.3926638066768646,
+        "mean_positive": 0.5000346352656683,
+        "mean_negative": 0.26334625671307244,
+        "separation": 0.9476217386939682
+      },
+      "pair_family_ood": {
+        "pairs": 600,
+        "roc_auc": 0.9821333333333334,
+        "average_precision": 0.9800309424818421,
+        "f1_at_val_threshold": 0.9404186795491143,
+        "threshold": 0.3926638066768646,
+        "mean_positive": 0.5297651876012485,
+        "mean_negative": 0.2738484556848804,
+        "separation": 1.374847102313337
+      },
+      "retrieval_id": {
+        "corpus": 60,
+        "queries": 60,
+        "hit_at_1": 0.9833333333333333,
+        "hit_at_5": 1.0,
+        "hit_at_10": 1.0,
+        "random_hit_at_10": 0.6825913942712365,
+        "precision_at_10": 0.6000000000000001,
+        "precision_at_min_r_10": 0.9611111111111111,
+        "random_precision_at_10": 0.09999999999999996,
+        "precision_lift_at_10": 6.000000000000003,
+        "recall_at_10": 1.0,
+        "mrr": 0.9888888888888888,
+        "ndcg_at_10": 0.9878531270705384,
+        "worst_domain_ndcg_at_10": 0.8936990366580583,
+        "per_domain_ndcg_at_10": {
+          "business": 0.9999999999999999,
+          "code_build": 0.9999999999999999,
+          "documents": 0.9999999999999999,
+          "identifiers": 0.9848322340473272,
+          "observability": 0.9999999999999999,
+          "opaque_encoding": 0.9999999999999999,
+          "operations": 0.9999999999999999,
+          "serialization": 0.9999999999999999,
+          "tables_cli": 0.8936990366580583,
+          "web_api": 0.9999999999999999
+        }
+      },
+      "retrieval_template_ood": {
+        "corpus": 60,
+        "queries": 60,
+        "hit_at_1": 0.7833333333333333,
+        "hit_at_5": 0.9833333333333333,
+        "hit_at_10": 1.0,
+        "random_hit_at_10": 0.6825913942712365,
+        "precision_at_10": 0.535,
+        "precision_at_min_r_10": 0.8083333333333332,
+        "random_precision_at_10": 0.09999999999999996,
+        "precision_lift_at_10": 5.350000000000002,
+        "recall_at_10": 0.8916666666666664,
+        "mrr": 0.8776388888888889,
+        "ndcg_at_10": 0.8572016735944818,
+        "worst_domain_ndcg_at_10": 0.5184368424181883,
+        "per_domain_ndcg_at_10": {
+          "business": 0.9999999999999999,
+          "code_build": 0.9999999999999999,
+          "documents": 0.9999999999999999,
+          "identifiers": 0.6824537302155437,
+          "observability": 0.5184368424181883,
+          "opaque_encoding": 0.9820351409125814,
+          "operations": 0.5558578444677291,
+          "serialization": 0.9999999999999999,
+          "tables_cli": 0.9999999999999999,
+          "web_api": 0.8332331779307761
+        }
+      },
+      "retrieval_family_ood": {
+        "corpus": 300,
+        "queries": 300,
+        "hit_at_1": 0.9366666666666666,
+        "hit_at_5": 0.97,
+        "hit_at_10": 0.9866666666666667,
+        "random_hit_at_10": 0.6572153155740706,
+        "precision_at_10": 0.9643333333333334,
+        "precision_at_min_r_10": 0.9643333333333334,
+        "random_precision_at_10": 0.09999999999999999,
+        "precision_lift_at_10": 9.643333333333334,
+        "recall_at_10": 0.3214444444444445,
+        "mrr": 0.9524233405483405,
+        "ndcg_at_10": 0.9590260186515792,
+        "worst_domain_ndcg_at_10": 0.6315622657748322,
+        "per_domain_ndcg_at_10": {
+          "business": 1.0,
+          "code_build": 1.0,
+          "documents": 1.0,
+          "identifiers": 1.0,
+          "observability": 1.0,
+          "opaque_encoding": 1.0,
+          "operations": 0.95869792074096,
+          "serialization": 1.0,
+          "tables_cli": 1.0,
+          "web_api": 0.6315622657748322
+        }
+      },
+      "clustering_id": {
+        "samples": 60,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "clustering_template_ood": {
+        "samples": 60,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "clustering_family_ood": {
+        "samples": 300,
+        "clusters": 10,
+        "ari": 1.0,
+        "nmi": 1.0
+      },
+      "operations": {
+        "triage_macro_f1_id": 1.0,
+        "triage_macro_f1_template_ood": 0.8375757575757576,
+        "family_novelty_samples_known": 60,
+        "family_novelty_samples_unknown": 60,
+        "family_novelty_positive_prevalence": 0.5,
+        "family_novelty_auroc": 1.0,
+        "family_novelty_average_precision": 0.9999999999999999,
+        "template_shift_auroc": 0.9700000000000001,
+        "template_shift_average_precision": 0.9744270728283416,
+        "mean_known_confidence": 0.824786365032196,
+        "mean_unknown_confidence": 0.4882272183895111
+      },
+      "mutations": {
+        "cases": 300,
+        "errors": 0,
+        "error_examples": [],
+        "mean_similarity": 0.965431266228358,
+        "p10_similarity": 0.9214996457099914,
+        "by_mutation": {
+          "crlf": 0.9802693903446198,
+          "nfd": 0.9999999950329462,
+          "trailing_space": 0.9511751443147659,
+          "truncated": 0.9711075296004613,
+          "zero_width": 0.9246042718489965
+        }
+      },
+      "performance": {
+        "texts": 160,
+        "throughput_texts_per_sec": 33863.88875791688,
+        "latency_ms_p50": 0.029110500236129155,
+        "latency_ms_p95": 0.032643600115989095,
+        "latency_ms_p99": 0.03509397995912877,
+        "stored_vector_bytes": 256,
+        "evaluation_vector_dtype": "int8",
+        "float_vector_bytes": 1024,
+        "repeat_encode_bit_identical": true,
+        "boundary_errors": 0,
+        "boundary_cases": [
+          {
+            "name": "ascii_0",
+            "length": 0,
+            "latency_ms": 0.026992000130121596,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_1",
+            "length": 1,
+            "latency_ms": 0.027491999389894772,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_16",
+            "length": 16,
+            "latency_ms": 0.029565000659204088,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_256",
+            "length": 256,
+            "latency_ms": 0.03707799987751059,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_4096",
+            "length": 4096,
+            "latency_ms": 0.1458750002711895,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_100000",
+            "length": 100000,
+            "latency_ms": 2.7805339996120892,
+            "valid": true,
+            "error": null
+          },
+          {
+            "name": "ascii_100001",
+            "length": 100001,
+            "latency_ms": 2.8253299997231807,
+            "valid": true,
+            "error": null
+          }
+        ]
+      },
+      "verdict": {
+        "decision": "SYNTHETIC_GO",
+        "decision_basis": "all synthetic benchmark gates passed; independent production validation is still required",
+        "bounded_known_format_pilot_eligible": true,
+        "passed": 21,
+        "total": 21,
+        "gates": {
+          "challenge_isolation": true,
+          "repeat_encode_bit_identical": true,
+          "boundary_safe": true,
+          "mutation_safe": true,
+          "storage_lte_256": true,
+          "throughput_gte_10k": true,
+          "id_pair_auc_gte_090": true,
+          "id_pair_fixed_f1_gte_080": true,
+          "family_ood_pair_auc_gte_085": true,
+          "id_retrieval_precision_at_min_r_10_gte_080": true,
+          "id_retrieval_ndcg10_gte_090": true,
+          "id_retrieval_worst_domain_ndcg_gte_075": true,
+          "template_ood_ndcg10_gte_075": true,
+          "template_ood_worst_domain_ndcg_gte_050": true,
+          "family_ood_ndcg10_gte_065": true,
+          "family_ood_worst_domain_ndcg_gte_050": true,
+          "id_clustering_ari_gte_065": true,
+          "family_ood_clustering_ari_gte_050": true,
+          "triage_id_f1_gte_085": true,
+          "triage_template_ood_f1_gte_075": true,
+          "family_novelty_auroc_gte_080": true
+        }
+      }
+    }
+  }
+}

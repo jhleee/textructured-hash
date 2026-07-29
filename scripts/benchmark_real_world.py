@@ -36,7 +36,7 @@ from src.data.real_world_benchmark import (
     serializable_specs,
 )
 
-DEFAULT_MODELS = ("fisher", "pattern_free", "structure_type_quantized_256", "tfidf_svd")
+DEFAULT_MODELS = ("generalized", "fisher", "pattern_free", "structure_type_quantized_256", "tfidf_svd")
 
 
 def _normalize(matrix: np.ndarray) -> np.ndarray:
@@ -346,11 +346,11 @@ def verdict(metrics: Dict[str, object], audit: Dict[str, object]) -> Dict[str, o
     )
     bounded_pilot_eligible = all(gates[name] for name in bounded_pilot_names)
     if all(gates.values()):
-        decision = "GO"
-        basis = "all general-production gates passed"
+        decision = "SYNTHETIC_GO"
+        basis = "all synthetic benchmark gates passed; independent production validation is still required"
     else:
         decision = "NO_GO"
-        basis = "one or more mandatory general-production gates failed"
+        basis = "one or more mandatory benchmark gates failed"
     return {
         "decision": decision,
         "decision_basis": basis,
@@ -441,30 +441,38 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
             f"- Balanced family-novelty AUROC/AP (50% baseline prevalence): {_fmt(metrics['operations']['family_novelty_auroc'])} / {_fmt(metrics['operations']['family_novelty_average_precision'])}",
             "",
         ])
-    decision_rank = {"GO": 2, "LIMITED_GO": 1, "NO_GO": 0}
+    decision_rank = {"SYNTHETIC_GO": 2, "LIMITED_GO": 1, "NO_GO": 0}
     best_model = max(results, key=lambda name: (decision_rank[results[name]["verdict"]["decision"]], results[name]["verdict"]["passed"]))
     best = results[best_model]
     template_failures = [name for name, value in best["retrieval_template_ood"]["per_domain_ndcg_at_10"].items() if value < 0.5]
     family_failures = [name for name, value in best["retrieval_family_ood"]["per_domain_ndcg_at_10"].items() if value < 0.5]
+    template_ready = best["verdict"]["gates"]["template_ood_ndcg10_gte_075"] and best["verdict"]["gates"]["template_ood_worst_domain_ndcg_gte_050"]
+    family_ready = best["verdict"]["gates"]["family_ood_ndcg10_gte_065"] and best["verdict"]["gates"]["family_ood_worst_domain_ndcg_gte_050"]
+    routing_ready = best["verdict"]["gates"]["triage_template_ood_f1_gte_075"]
+    template_recommendation = "**Shadow candidate**; calibrate abstention/fallback before pilot" if template_ready else "**Human-assisted only**"
+    family_recommendation = "**Shadow candidate only**; independent source-family holdout required" if family_ready else "**Do not automate**"
+    routing_recommendation = "**Shadow candidate**; abstention coverage-risk is not yet measured" if routing_ready else "**Known templates only**, with abstention and fallback"
+    models_display = " ".join(str(model) for model in config["models"])
+    output_display = output_dir.relative_to(ROOT) if output_dir.is_relative_to(ROOT) else output_dir
     lines.extend([
         "## Practical use-case assessment",
         "",
-        f"The strongest candidate is **{best_model}**, and its general-production verdict is **{best['verdict']['decision']}**. Bounded known-format pilot eligibility: **{best['verdict']['bounded_known_format_pilot_eligible']}**.",
+        f"The strongest candidate is **{best_model}**, and its synthetic benchmark verdict is **{best['verdict']['decision']}**. Bounded known-format pilot eligibility: **{best['verdict']['bounded_known_format_pilot_eligible']}**.",
         "",
         "| Use case | Evidence from strongest candidate | Recommendation |",
         "|---|---|---|",
         f"| Known-format similarity search | ID nDCG@10 {_fmt(best['retrieval_id']['ndcg_at_10'])}, P@min(R,10) {_fmt(best['retrieval_id']['precision_at_min_r_10'])} ({_fmt(best['retrieval_id']['precision_lift_at_10'])}x random P@10) | **Pilot** for bounded, versioned format catalogs |",
-        f"| New-template search | nDCG@10 {_fmt(best['retrieval_template_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_template_ood']['worst_domain_ndcg_at_10'])} | **Human-assisted only**; failures: {', '.join(template_failures) or 'none'} |",
-        f"| Completely unseen-family search | nDCG@10 {_fmt(best['retrieval_family_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_family_ood']['worst_domain_ndcg_at_10'])} | **Do not automate**; failures: {', '.join(family_failures) or 'none'} |",
+        f"| New-template search | nDCG@10 {_fmt(best['retrieval_template_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_template_ood']['worst_domain_ndcg_at_10'])} | {template_recommendation}; failures: {', '.join(template_failures) or 'none'} |",
+        f"| Completely unseen-family search | nDCG@10 {_fmt(best['retrieval_family_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_family_ood']['worst_domain_ndcg_at_10'])} | {family_recommendation}; failures: {', '.join(family_failures) or 'none'} |",
         f"| Offline format discovery/clustering | ID/family-OOD ARI {_fmt(best['clustering_id']['ari'])}/{_fmt(best['clustering_family_ood']['ari'])} | **Promising** for analyst-reviewed grouping |",
-        f"| Known-format routing/triage | ID macro-F1 {_fmt(best['operations']['triage_macro_f1_id'])}; template-OOD macro-F1 {_fmt(best['operations']['triage_macro_f1_template_ood'])} | **Known templates only**, with abstention and fallback |",
+        f"| Known-format routing/triage | ID macro-F1 {_fmt(best['operations']['triage_macro_f1_id'])}; template-OOD macro-F1 {_fmt(best['operations']['triage_macro_f1_template_ood'])} | {routing_recommendation} |",
         f"| Drift/anomaly candidate ranking | Balanced family-novelty AUROC {_fmt(best['operations']['family_novelty_auroc'])}, AP {_fmt(best['operations']['family_novelty_average_precision'])} | **Shadow alerts only** until real prevalence is measured |",
         f"| Clipboard/log/config organization | Mutation p10 cosine {_fmt(best['mutations']['p10_similarity'])}; boundary errors {best['performance']['boundary_errors']} | **Suitable pilot** with explicit UTF-8 and length policy |",
         "| Semantic or entity-level retrieval | Benchmark labels structure, not meaning | **Not supported** by this research |",
         "",
-        "### Main failure modes",
+        "### Remaining risks and transfer profile",
         "",
-        f"- Cross-template pair transfer drops from ID AUC/F1 {_fmt(best['pair_id']['roc_auc'])}/{_fmt(best['pair_id']['f1_at_val_threshold'])} to family-OOD AUC/F1 {_fmt(best['pair_family_ood']['roc_auc'])}/{_fmt(best['pair_family_ood']['f1_at_val_threshold'])}.",
+        f"- Cross-template pair AUC/F1 for ID, template-OOD, and family-OOD: {_fmt(best['pair_id']['roc_auc'])}/{_fmt(best['pair_id']['f1_at_val_threshold'])}, {_fmt(best['pair_template_ood']['roc_auc'])}/{_fmt(best['pair_template_ood']['f1_at_val_threshold'])}, {_fmt(best['pair_family_ood']['roc_auc'])}/{_fmt(best['pair_family_ood']['f1_at_val_threshold'])}.",
         f"- Average OOD scores hide complete domain failures. Template-OOD failed in {', '.join(template_failures) or 'no domain'}; family-OOD failed in {', '.join(family_failures) or 'no domain'}.",
         "- Clustering uses the true number of families as K; it supports analyst-reviewed grouping, not automatic discovery of cluster count.",
         "- ID evaluation deliberately reuses renderer families with disjoint roots. Only template-OOD and family-OOD results support generalization claims.",
@@ -478,12 +486,14 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
         "- Retrieval relevance is format-family relevance. A product seeking semantic, entity, or exact-near-duplicate relevance needs a separate label contract.",
         "- Quality metrics use the same deployed representation counted by the storage gate (true int8 where available; otherwise float32).",
         "- Throughput is a single-process warm local measurement without vector-database or network overhead.",
-        "- `NO_GO` means no general production claim under these gates; it does not mean the encoder has no useful narrower application.",
+        "- `SYNTHETIC_GO` means every gate on this fixed synthetic development benchmark passed; it is not a production guarantee. `NO_GO` means one or more mandatory benchmark gates failed.",
+        "- The adaptive visual-column and machine-delimiter experts were selected on this benchmark. Their gains require confirmation on a post-freeze independent generator/source-family holdout.",
+        "- Abstention and fallback recommendations are intentionally deferred because no threshold, coverage-risk, or fallback evaluation is included.",
         "",
         "## Reproduce",
         "",
         "```bash",
-        "PYTHONHASHSEED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python scripts/benchmark_real_world.py --roots-per-family 30 --output results/extended_real_world",
+        f"PYTHONHASHSEED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python scripts/benchmark_real_world.py --models {models_display} --roots-per-family {config['roots_per_family']} --seed {config['seed']} --output {output_display}",
         "```",
         "",
         "## Recommended next validation",

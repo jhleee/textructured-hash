@@ -19,6 +19,7 @@ from src.encoders.proposed.structure_type_quantized import QuantizedEncoder, Qua
 from src.encoders.proposed.ngram_hash import NgramHashEncoder, NgramHashMultiscaleEncoder
 from src.encoders.proposed.pattern_free import PatternFreeEncoder
 from src.encoders.proposed.fisher_encoder import FisherStructureEncoder
+from src.encoders.proposed.generalized_structure import GeneralizedStructureEncoder
 from src.evaluation.metrics import evaluate, benchmark_efficiency
 
 
@@ -87,6 +88,11 @@ def get_encoder(model_name: str, train_pairs=None):
         return PatternFreeEncoder(dim=128, seed=42)
     elif model_name == 'fisher':
         encoder = FisherStructureEncoder(dim=256, seed=42)
+        if train_pairs:
+            encoder.train(train_pairs)
+        return encoder
+    elif model_name == 'generalized':
+        encoder = GeneralizedStructureEncoder(dim=256, seed=42)
         if train_pairs:
             encoder.train(train_pairs)
         return encoder
@@ -169,7 +175,8 @@ def main():
                         choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale',
                                  'structure_type', 'structure_type_fast',
                                  'structure_type_quantized', 'structure_type_quantized_256',
-                                 'ngram_hash', 'ngram_hash_multiscale', 'pattern_free', 'fisher'],
+                                 'ngram_hash', 'ngram_hash_multiscale', 'pattern_free', 'fisher',
+                                 'generalized'],
                         help='Model name')
     parser.add_argument('--test', type=str, default='data/test.jsonl',
                         help='Test data file')
@@ -194,7 +201,7 @@ def main():
     print(f"Loaded {len(test_pairs)} test pairs")
 
     train_pairs = None
-    if args.model in ['tfidf_svd', 'ngram_hash', 'ngram_hash_multiscale', 'fisher']:
+    if args.model in ['tfidf_svd', 'ngram_hash', 'ngram_hash_multiscale', 'fisher', 'generalized']:
         print(f"\nLoading train data from {args.train}...")
         train_pairs = load_pairs(args.train)
         print(f"Loaded {len(train_pairs)} train pairs")
@@ -203,11 +210,14 @@ def main():
     print(f"\nInitializing {args.model} encoder...")
     encoder = get_encoder(args.model, train_pairs)
 
+    # Evaluate the representation that is actually stored in deployment.
+    deployment_encode = encoder.encode_int8 if hasattr(encoder, 'encode_int8') else encoder.encode
+
     # Evaluate quality
     print(f"\n{'='*60}")
     print("Quality Evaluation")
     print(f"{'='*60}")
-    quality_metrics = evaluate(encoder.encode, test_pairs)
+    quality_metrics = evaluate(deployment_encode, test_pairs)
 
     print("\nQuality Metrics:")
     for key, value in quality_metrics.items():
@@ -225,7 +235,7 @@ def main():
         test_texts.append(pair['text2'])
     test_texts = list(set(test_texts))[:500]  # Unique texts
 
-    efficiency_metrics = benchmark_efficiency(encoder.encode, test_texts, n_iterations=3)
+    efficiency_metrics = benchmark_efficiency(deployment_encode, test_texts, n_iterations=3)
 
     print("\nEfficiency Metrics:")
     for key, value in efficiency_metrics.items():

@@ -115,7 +115,7 @@ def _extract_features_numba(byte_arr, features, struct_chars,
     if n_bytes >= 2:
         inv_bi = 1.0 / (n_bytes - 1)
         for i in range(n_bytes - 1):
-            bigram_val = byte_arr[i] * 256 + byte_arr[i+1]
+            bigram_val = int(byte_arr[i]) * 256 + int(byte_arr[i+1])
             features[76 + bigram_val % 64] += inv_bi
     
     # === [140:172] Structural character frequencies ===
@@ -266,15 +266,15 @@ def _extract_features_numba(byte_arr, features, struct_chars,
     if n_bytes >= 3:
         inv_tri = 1.0 / (n_bytes - 2)
         for i in range(n_bytes - 2):
-            tri_val = (byte_arr[i] * 65536 + byte_arr[i+1] * 256 + byte_arr[i+2]) % 64
+            tri_val = (int(byte_arr[i]) * 65536 + int(byte_arr[i+1]) * 256 + int(byte_arr[i+2])) % 64
             features[220 + tri_val] += inv_tri
     
     # === [284:316] Quadgram hash features (32 bins) ===
     if n_bytes >= 4:
         inv_quad = 1.0 / (n_bytes - 3)
         for i in range(n_bytes - 3):
-            quad_val = (byte_arr[i] * 16777216 + byte_arr[i+1] * 65536 + 
-                       byte_arr[i+2] * 256 + byte_arr[i+3]) % 32
+            quad_val = (int(byte_arr[i]) * 16777216 + int(byte_arr[i+1]) * 65536 +
+                       int(byte_arr[i+2]) * 256 + int(byte_arr[i+3])) % 32
             features[284 + quad_val] += inv_quad
     
     # === [316:320] Additional features ===
