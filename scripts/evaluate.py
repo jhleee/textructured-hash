@@ -18,6 +18,7 @@ from src.encoders.proposed.structure_type_fast import StructureTypeFastEncoder
 from src.encoders.proposed.structure_type_quantized import QuantizedEncoder, QuantizedStructureTypeCompactEncoder
 from src.encoders.proposed.ngram_hash import NgramHashEncoder, NgramHashMultiscaleEncoder
 from src.encoders.proposed.pattern_free import PatternFreeEncoder
+from src.encoders.proposed.fisher_encoder import FisherStructureEncoder
 from src.evaluation.metrics import evaluate, benchmark_efficiency
 
 
@@ -84,6 +85,11 @@ def get_encoder(model_name: str, train_pairs=None):
         return encoder
     elif model_name == 'pattern_free':
         return PatternFreeEncoder(dim=128, seed=42)
+    elif model_name == 'fisher':
+        encoder = FisherStructureEncoder(dim=256, seed=42)
+        if train_pairs:
+            encoder.train(train_pairs)
+        return encoder
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -163,7 +169,7 @@ def main():
                         choices=['random_projection', 'simhash', 'minhash', 'tfidf_svd', 'multiscale',
                                  'structure_type', 'structure_type_fast',
                                  'structure_type_quantized', 'structure_type_quantized_256',
-                                 'ngram_hash', 'ngram_hash_multiscale', 'pattern_free'],
+                                 'ngram_hash', 'ngram_hash_multiscale', 'pattern_free', 'fisher'],
                         help='Model name')
     parser.add_argument('--test', type=str, default='data/test.jsonl',
                         help='Test data file')
@@ -188,7 +194,7 @@ def main():
     print(f"Loaded {len(test_pairs)} test pairs")
 
     train_pairs = None
-    if args.model in ['tfidf_svd', 'ngram_hash', 'ngram_hash_multiscale']:
+    if args.model in ['tfidf_svd', 'ngram_hash', 'ngram_hash_multiscale', 'fisher']:
         print(f"\nLoading train data from {args.train}...")
         train_pairs = load_pairs(args.train)
         print(f"Loaded {len(train_pairs)} train pairs")
