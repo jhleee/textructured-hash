@@ -1,22 +1,22 @@
 {
   "quality": {
-    "auc_roc": 0.9977191717729985,
+    "auc_roc": 0.9979054026993472,
     "precision_at_100": 1.0,
     "precision_at_1000": 0.979,
-    "separation": 3.702717933062424,
-    "best_f1": 0.9874055415617129,
-    "best_threshold": 0.6000000000000002,
-    "mean_pos_sim": 0.9468545902338696,
-    "mean_neg_sim": -0.03767682939803393,
-    "std_pos_sim": 0.061268413874956726,
-    "std_neg_sim": 0.20462583922775016
+    "separation": 3.7447708751741278,
+    "best_f1": 0.9874182184197282,
+    "best_threshold": 0.5000000000000001,
+    "mean_pos_sim": 0.947163781999209,
+    "mean_neg_sim": -0.03650039064263801,
+    "std_pos_sim": 0.06304361511672639,
+    "std_neg_sim": 0.19963311599880032
   },
   "efficiency": {
-    "encoding_speed": 74495.146391377,
+    "encoding_speed": 73570.13499277284,
     "vector_bytes": 256,
     "vector_bytes_float32": 1024,
     "vector_dimensions": 256,
-    "comparison_speed": 1644184.580057184,
-    "total_encoding_time_ms": 6.711846666803467
+    "comparison_speed": 1676336.6141427204,
+    "total_encoding_time_ms": 6.796236000506421
   }
 }

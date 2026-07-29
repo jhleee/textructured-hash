@@ -557,3 +557,55 @@ class FisherStructureEncoder(BaseEncoder):
             vec = vec / norm
         
         return vec.astype(np.float32)
+
+    def encode_int8(self, text: str) -> np.ndarray:
+        """
+        Encode to true int8 vector for minimal storage (256 bytes for dim=256).
+
+        Scales the L2-normalized float32 vector to int8 range [-127, 127].
+        This is the actual quantized representation for storage.
+        """
+        vec_f32 = self.encode(text)
+        vec_i8 = np.round(vec_f32 * 127.0).astype(np.int8)
+        return vec_i8
+
+    def save(self, path: str) -> None:
+        """
+        Save trained model state (W, feature_mean, feature_std) to a .npz file.
+
+        Args:
+            path: File path to save (should end in .npz)
+        """
+        np.savez(
+            path,
+            W=self.W,
+            feature_mean=self.feature_mean,
+            feature_std=self.feature_std,
+            dim=np.array([self._dim]),
+            feature_dim=np.array([self.feature_dim]),
+            trained=np.array([self.trained]),
+        )
+
+    @classmethod
+    def load(cls, path: str, seed: int = 42) -> 'FisherStructureEncoder':
+        """
+        Load a trained model from a .npz file.
+
+        Args:
+            path: File path to load from
+            seed: Random seed (used only for numba warmup)
+
+        Returns:
+            FisherStructureEncoder instance with restored trained state
+        """
+        data = np.load(path)
+        dim = int(data['dim'][0])
+        feature_dim = int(data['feature_dim'][0])
+
+        encoder = cls(dim=dim, feature_dim=feature_dim, seed=seed)
+        encoder.W = data['W']
+        encoder.feature_mean = data['feature_mean']
+        encoder.feature_std = data['feature_std']
+        encoder.trained = bool(data['trained'][0])
+
+        return encoder
