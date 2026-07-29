@@ -138,9 +138,13 @@ def benchmark_efficiency(encoder: Callable, test_texts: List[str], n_iterations:
 
     comparisons_per_sec = n_comparisons / comparison_time if comparison_time > 0 else 0
 
+    # Int8 quantized size (for storage): 1 byte per dimension
+    vec_bytes_int8 = vec_dims
+
     return {
         "encoding_speed": float(texts_per_sec),  # texts/sec
-        "vector_bytes": int(vec_bytes),
+        "vector_bytes": int(vec_bytes_int8),  # int8 quantized storage size
+        "vector_bytes_float32": int(vec_bytes),  # actual float32 size
         "vector_dimensions": int(vec_dims),
         "comparison_speed": float(comparisons_per_sec),  # comparisons/sec
         "total_encoding_time_ms": float(avg_time * 1000)
