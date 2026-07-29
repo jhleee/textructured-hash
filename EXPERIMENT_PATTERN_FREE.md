@@ -1,5 +1,7 @@
 # Experiment: Removing Hardcoded Regex Patterns from Text Hashing Algorithm
 
+> **Historical experiment snapshot.** 이 문서의 generalization 및 production 추천은 당시 pair benchmark에 근거합니다. 후속 전체 OOD 결과와 현재 결론은 [`results/FINAL_REPORT.md`](results/FINAL_REPORT.md)를 우선합니다.
+
 ## Motivation
 
 Previous implementations (StructureTypeEncoder, StructureTypeFastEncoder, QuantizedEncoder) relied on **23 hardcoded regex patterns** to detect text types:

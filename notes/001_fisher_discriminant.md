@@ -1,5 +1,7 @@
 # Experiment 001: Fisher Discriminant Structure Encoder
 
+> **Historical experiment snapshot.** Fisher의 7/7은 초기 24-category pair benchmark 결과입니다. 후속 OOD 평가와 현재 우승자는 [`../results/FINAL_REPORT.md`](../results/FINAL_REPORT.md)를 참조하세요.
+
 ## Date
 2025-01-XX
 
