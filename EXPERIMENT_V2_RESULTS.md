@@ -1,5 +1,7 @@
 # Experiment V2 Results: Algorithm Improvement
 
+> **Historical experiment snapshot.** 이 문서의 “best”와 production 추천은 V2 후보군·legacy pair benchmark에 한정됩니다. 현재 15-model 전체 결과는 [`results/FINAL_REPORT.md`](results/FINAL_REPORT.md)를 우선합니다.
+
 ## Executive Summary
 
 Implemented and evaluated 4 experimental approaches to improve the text structure hashing algorithm:

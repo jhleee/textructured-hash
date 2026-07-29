@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import math
+import os
 import platform
 import sys
 import time
@@ -36,7 +38,34 @@ from src.data.real_world_benchmark import (
     serializable_specs,
 )
 
-DEFAULT_MODELS = ("generalized", "fisher", "pattern_free", "structure_type_quantized_256", "tfidf_svd")
+ALL_MODELS = (
+    "random_projection",
+    "simhash",
+    "minhash",
+    "tfidf_svd",
+    "multiscale",
+    "structure_type",
+    "structure_type_fast",
+    "structure_type_quantized",
+    "structure_type_quantized_256",
+    "ngram_hash",
+    "ngram_hash_multiscale",
+    "pattern_free",
+    "learned_weights",
+    "fisher",
+    "generalized",
+)
+DEFAULT_MODELS = ALL_MODELS
+CANONICAL_ROOTS_PER_FAMILY = 30
+CANONICAL_SEED = 20260729
+
+
+def _package_version(name: str) -> str:
+    """Return an installed package version for benchmark provenance."""
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "not-installed"
 
 
 def _normalize(matrix: np.ndarray) -> np.ndarray:
@@ -269,15 +298,18 @@ def mutation_metrics(encoder, records: Sequence[Dict[str, object]]) -> Dict[str,
 
 def performance_metrics(encoder, records: Sequence[Dict[str, object]]) -> Dict[str, object]:
     texts = [str(record["text"]) for record in records if record["split"] == "test"][:160]
-    for text in texts[:5]:
+    for text in texts:
         _deployment_vector(encoder, text)
     latencies = []
-    start = time.perf_counter()
-    for text in texts:
-        item_start = time.perf_counter()
-        _deployment_vector(encoder, text)
-        latencies.append((time.perf_counter() - item_start) * 1000)
-    elapsed = time.perf_counter() - start
+    throughput_runs = []
+    for _ in range(5):
+        start = time.perf_counter()
+        for text in texts:
+            item_start = time.perf_counter()
+            _deployment_vector(encoder, text)
+            latencies.append((time.perf_counter() - item_start) * 1000)
+        elapsed = time.perf_counter() - start
+        throughput_runs.append(float(len(texts) / elapsed))
     _, stored_bytes = _encode_texts(encoder, texts[:1])
     repeated_first = _deployment_vector(encoder, texts[0])
     repeated_second = _deployment_vector(encoder, texts[0])
@@ -295,7 +327,9 @@ def performance_metrics(encoder, records: Sequence[Dict[str, object]]) -> Dict[s
             boundary.append({"name": case["name"], "length": case["length"], "latency_ms": None, "valid": False, "error": type(exc).__name__})
     return {
         "texts": len(texts),
-        "throughput_texts_per_sec": float(len(texts) / elapsed),
+        "throughput_texts_per_sec": float(np.median(throughput_runs)),
+        "throughput_repetitions": len(throughput_runs),
+        "throughput_runs_texts_per_sec": throughput_runs,
         "latency_ms_p50": float(np.percentile(latencies, 50)),
         "latency_ms_p95": float(np.percentile(latencies, 95)),
         "latency_ms_p99": float(np.percentile(latencies, 99)),
@@ -363,7 +397,10 @@ def verdict(metrics: Dict[str, object], audit: Dict[str, object]) -> Dict[str, o
 
 def evaluate_model(model_name: str, records: Sequence[Dict[str, object]], train_pairs: Sequence[Dict[str, object]], audit: Dict[str, object]) -> Dict[str, object]:
     print(f"\n{'=' * 72}\n{model_name}\n{'=' * 72}")
+    model_start = time.perf_counter()
+    training_start = time.perf_counter()
     encoder = get_encoder(model_name, list(train_pairs))
+    training_seconds = time.perf_counter() - training_start
     val_pairs = build_pairs(records, "val", per_family=30)
     _, val_scores = _pair_scores(encoder, val_pairs)
     val_labels = np.asarray([int(float(pair["label"])) for pair in val_pairs])
@@ -385,6 +422,10 @@ def evaluate_model(model_name: str, records: Sequence[Dict[str, object]], train_
         "performance": performance_metrics(encoder, records),
     }
     metrics["verdict"] = verdict(metrics, audit)
+    metrics["runtime"] = {
+        "training_seconds": float(training_seconds),
+        "total_seconds": float(time.perf_counter() - model_start),
+    }
     print(f"Decision: {metrics['verdict']['decision']} ({metrics['verdict']['passed']}/{metrics['verdict']['total']} gates)")
     return metrics
 
@@ -395,11 +436,44 @@ def _fmt(value: object) -> str:
     return str(value)
 
 
+def rank_models(results: Dict[str, Dict[str, object]]) -> List[str]:
+    """Rank candidates by predeclared gates, then OOD quality and efficiency."""
+    decision_rank = {"SYNTHETIC_GO": 2, "LIMITED_GO": 1, "NO_GO": 0}
+
+    def score(model_name: str) -> Tuple[object, ...]:
+        metrics = results[model_name]
+        return (
+            decision_rank[metrics["verdict"]["decision"]],
+            metrics["verdict"]["passed"],
+            metrics["retrieval_family_ood"]["worst_domain_ndcg_at_10"],
+            metrics["retrieval_template_ood"]["worst_domain_ndcg_at_10"],
+            metrics["pair_family_ood"]["roc_auc"],
+            metrics["retrieval_id"]["ndcg_at_10"],
+            metrics["performance"]["throughput_texts_per_sec"],
+        )
+
+    return sorted(results, key=score, reverse=True)
+
+
 def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit: Dict[str, object], config: Dict[str, object]) -> None:
+    ranking = rank_models(results)
+    winner = ranking[0]
+    is_full_benchmark = config["benchmark_scope"] == "repository_full"
+    title = "Final Full Benchmark Results" if is_full_benchmark else "Partial Candidate Benchmark Results"
+    scope_statement = (
+        "This benchmark compares every implemented encoder under one deterministic, leak-resistant protocol."
+        if is_full_benchmark
+        else "This is a partial comparison of selected encoders; it must not be used to claim a repository-wide winner."
+    )
+    winner_statement = (
+        f"**Final synthetic benchmark winner: `{winner}`.**"
+        if is_full_benchmark
+        else f"**Strongest candidate in this partial run: `{winner}`.**"
+    )
     lines = [
-        "# Extended Real-World Validation Results",
+        f"# {title}",
         "",
-        "This benchmark uses deterministic, privacy-safe synthetic operational data. It is more realistic than the original category interpolation test, but it is not a substitute for a de-identified production pilot.",
+        f"{scope_statement} It uses privacy-safe synthetic operational data and is not a substitute for an independent post-freeze holdout or a de-identified production pilot.",
         "",
         "## Dataset and integrity",
         "",
@@ -410,6 +484,9 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
         f"- Deterministic manifest SHA-256: `{audit['manifest_sha256']}`",
         "- Family-OOD policy: one of two families per domain is entirely excluded from training",
         "- Pair threshold policy: selected on validation once and frozen for test/OOD",
+        f"- Candidate coverage: {len(results)} selected encoders ({', '.join(results)})",
+        f"- Benchmark scope: `{config['benchmark_scope']}`",
+        "- Deployment representation: `encode_int8` when implemented, otherwise float32 `encode` output",
         "",
         "## Results summary",
         "",
@@ -427,6 +504,27 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
                 s=metrics["performance"]["throughput_texts_per_sec"], b=f"{metrics['performance']['stored_vector_bytes']}/{metrics['performance']['evaluation_vector_dtype']}", v=metrics["verdict"]["decision"],
             )
         )
+    lines.extend([
+        "",
+        "## Winner and ranking" if is_full_benchmark else "## Selected-candidate ranking",
+        "",
+        winner_statement,
+        "",
+        "Ranking policy (declared in code): verdict class, gates passed, family-OOD worst-domain nDCG@10, template-OOD worst-domain nDCG@10, family-OOD pair AUC, ID nDCG@10, then throughput. Test thresholds are never retuned.",
+        "",
+        "| Rank | Model | Decision | Gates | Family OOD worst-domain nDCG@10 | Template OOD worst-domain nDCG@10 | Family OOD pair AUC | Throughput/s |",
+        "|---:|---|---|---:|---:|---:|---:|---:|",
+    ])
+    for index, model in enumerate(ranking, start=1):
+        metrics = results[model]
+        lines.append(
+            f"| {index} | {model} | {metrics['verdict']['decision']} | "
+            f"{metrics['verdict']['passed']}/{metrics['verdict']['total']} | "
+            f"{_fmt(metrics['retrieval_family_ood']['worst_domain_ndcg_at_10'])} | "
+            f"{_fmt(metrics['retrieval_template_ood']['worst_domain_ndcg_at_10'])} | "
+            f"{_fmt(metrics['pair_family_ood']['roc_auc'])} | "
+            f"{metrics['performance']['throughput_texts_per_sec']:.0f} |"
+        )
     lines.extend(["", "## Gate details", ""])
     for model, metrics in results.items():
         verdict_data = metrics["verdict"]
@@ -441,33 +539,32 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
             f"- Balanced family-novelty AUROC/AP (50% baseline prevalence): {_fmt(metrics['operations']['family_novelty_auroc'])} / {_fmt(metrics['operations']['family_novelty_average_precision'])}",
             "",
         ])
-    decision_rank = {"SYNTHETIC_GO": 2, "LIMITED_GO": 1, "NO_GO": 0}
-    best_model = max(results, key=lambda name: (decision_rank[results[name]["verdict"]["decision"]], results[name]["verdict"]["passed"]))
+    best_model = winner
     best = results[best_model]
     template_failures = [name for name, value in best["retrieval_template_ood"]["per_domain_ndcg_at_10"].items() if value < 0.5]
     family_failures = [name for name, value in best["retrieval_family_ood"]["per_domain_ndcg_at_10"].items() if value < 0.5]
     template_ready = best["verdict"]["gates"]["template_ood_ndcg10_gte_075"] and best["verdict"]["gates"]["template_ood_worst_domain_ndcg_gte_050"]
     family_ready = best["verdict"]["gates"]["family_ood_ndcg10_gte_065"] and best["verdict"]["gates"]["family_ood_worst_domain_ndcg_gte_050"]
     routing_ready = best["verdict"]["gates"]["triage_template_ood_f1_gte_075"]
-    template_recommendation = "**Shadow candidate**; calibrate abstention/fallback before pilot" if template_ready else "**Human-assisted only**"
-    family_recommendation = "**Shadow candidate only**; independent source-family holdout required" if family_ready else "**Do not automate**"
-    routing_recommendation = "**Shadow candidate**; abstention coverage-risk is not yet measured" if routing_ready else "**Known templates only**, with abstention and fallback"
+    template_recommendation = "**Synthetic evidence only**; require independent holdout and abstention calibration" if template_ready else "**Human-assisted only**"
+    family_recommendation = "**Synthetic evidence only**; require independent source-family holdout" if family_ready else "**Do not automate**"
+    routing_recommendation = "**Synthetic evidence only**; require holdout coverage-risk evaluation" if routing_ready else "**Known templates only**, with abstention and fallback"
     models_display = " ".join(str(model) for model in config["models"])
     output_display = output_dir.relative_to(ROOT) if output_dir.is_relative_to(ROOT) else output_dir
     lines.extend([
         "## Practical use-case assessment",
         "",
-        f"The strongest candidate is **{best_model}**, and its synthetic benchmark verdict is **{best['verdict']['decision']}**. Bounded known-format pilot eligibility: **{best['verdict']['bounded_known_format_pilot_eligible']}**.",
+        f"The strongest candidate in this run is **{best_model}**, and its synthetic benchmark verdict is **{best['verdict']['decision']}**. Synthetic bounded-known-format eligibility: **{best['verdict']['bounded_known_format_pilot_eligible']}**; this is not operational approval.",
         "",
         "| Use case | Evidence from strongest candidate | Recommendation |",
         "|---|---|---|",
-        f"| Known-format similarity search | ID nDCG@10 {_fmt(best['retrieval_id']['ndcg_at_10'])}, P@min(R,10) {_fmt(best['retrieval_id']['precision_at_min_r_10'])} ({_fmt(best['retrieval_id']['precision_lift_at_10'])}x random P@10) | **Pilot** for bounded, versioned format catalogs |",
+        f"| Known-format similarity search | ID nDCG@10 {_fmt(best['retrieval_id']['ndcg_at_10'])}, P@min(R,10) {_fmt(best['retrieval_id']['precision_at_min_r_10'])} ({_fmt(best['retrieval_id']['precision_lift_at_10'])}x random P@10) | **Synthetic evidence only**; independent holdout required before any shadow pilot |",
         f"| New-template search | nDCG@10 {_fmt(best['retrieval_template_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_template_ood']['worst_domain_ndcg_at_10'])} | {template_recommendation}; failures: {', '.join(template_failures) or 'none'} |",
         f"| Completely unseen-family search | nDCG@10 {_fmt(best['retrieval_family_ood']['ndcg_at_10'])}, worst-domain {_fmt(best['retrieval_family_ood']['worst_domain_ndcg_at_10'])} | {family_recommendation}; failures: {', '.join(family_failures) or 'none'} |",
         f"| Offline format discovery/clustering | ID/family-OOD ARI {_fmt(best['clustering_id']['ari'])}/{_fmt(best['clustering_family_ood']['ari'])} | **Promising** for analyst-reviewed grouping |",
         f"| Known-format routing/triage | ID macro-F1 {_fmt(best['operations']['triage_macro_f1_id'])}; template-OOD macro-F1 {_fmt(best['operations']['triage_macro_f1_template_ood'])} | {routing_recommendation} |",
-        f"| Drift/anomaly candidate ranking | Balanced family-novelty AUROC {_fmt(best['operations']['family_novelty_auroc'])}, AP {_fmt(best['operations']['family_novelty_average_precision'])} | **Shadow alerts only** until real prevalence is measured |",
-        f"| Clipboard/log/config organization | Mutation p10 cosine {_fmt(best['mutations']['p10_similarity'])}; boundary errors {best['performance']['boundary_errors']} | **Suitable pilot** with explicit UTF-8 and length policy |",
+        f"| Drift/anomaly candidate ranking | Balanced family-novelty AUROC {_fmt(best['operations']['family_novelty_auroc'])}, AP {_fmt(best['operations']['family_novelty_average_precision'])} | **Offline analysis only** until independent holdout and real prevalence are measured |",
+        f"| Clipboard/log/config organization | Mutation p10 cosine {_fmt(best['mutations']['p10_similarity'])}; boundary errors {best['performance']['boundary_errors']} | **Synthetic evidence only**; independent holdout required before any shadow pilot |",
         "| Semantic or entity-level retrieval | Benchmark labels structure, not meaning | **Not supported** by this research |",
         "",
         "### Remaining risks and transfer profile",
@@ -485,7 +582,7 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
         "- Results are point estimates without grouped bootstrap confidence intervals, and generator/source families are not independently held out.",
         "- Retrieval relevance is format-family relevance. A product seeking semantic, entity, or exact-near-duplicate relevance needs a separate label contract.",
         "- Quality metrics use the same deployed representation counted by the storage gate (true int8 where available; otherwise float32).",
-        "- Throughput is a single-process warm local measurement without vector-database or network overhead.",
+        "- Throughput is the median of five single-process warm local runs without vector-database or network overhead.",
         "- `SYNTHETIC_GO` means every gate on this fixed synthetic development benchmark passed; it is not a production guarantee. `NO_GO` means one or more mandatory benchmark gates failed.",
         "- The adaptive visual-column and machine-delimiter experts were selected on this benchmark. Their gains require confirmation on a post-freeze independent generator/source-family holdout.",
         "- Abstention and fallback recommendations are intentionally deferred because no threshold, coverage-risk, or fallback evaluation is included.",
@@ -498,20 +595,34 @@ def write_report(output_dir: Path, results: Dict[str, Dict[str, object]], audit:
         "",
         "## Recommended next validation",
         "",
-        "1. Run a shadow pilot on de-identified traffic, with source/template groups assigned before train/test splitting.",
-        "2. Manually adjudicate the highest-impact false matches in the failed domains and define the exact relevance contract.",
-        "3. Calibrate routing abstention and anomaly thresholds on real prevalence; do not reuse the synthetic threshold.",
+        "1. Freeze the winner and run the independent post-freeze grouped holdout before any shadow pilot.",
+        "2. If the holdout passes, run a de-identified shadow pilot with source/template groups assigned before splitting.",
+        "3. Manually adjudicate high-impact false matches and calibrate abstention on real prevalence.",
         "4. Add a vector-database integration benchmark at the intended corpus size before committing to latency or index-size targets.",
     ])
     (output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    (output_dir / "metrics.json").write_text(json.dumps({"config": config, "audit": audit, "models": results}, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "metrics.json").write_text(
+        json.dumps(
+            {
+                "config": config,
+                "audit": audit,
+                "winner": winner,
+                "winner_scope": config["benchmark_scope"],
+                "ranking": ranking,
+                "models": results,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models", nargs="+", default=list(DEFAULT_MODELS))
-    parser.add_argument("--roots-per-family", type=int, default=30)
-    parser.add_argument("--seed", type=int, default=20260729)
+    parser.add_argument("--roots-per-family", type=int, default=CANONICAL_ROOTS_PER_FAMILY)
+    parser.add_argument("--seed", type=int, default=CANONICAL_SEED)
     parser.add_argument("--output", type=Path, default=ROOT / "results" / "extended_real_world")
     args = parser.parse_args()
 
@@ -524,16 +635,40 @@ def main() -> None:
         raise RuntimeError(f"Dataset integrity gate failed: {audit}")
 
     train_pairs = build_training_pairs(records, args.seed)
+    benchmark_scope = (
+        "repository_full"
+        if tuple(args.models) == ALL_MODELS
+        and args.roots_per_family == CANONICAL_ROOTS_PER_FAMILY
+        and args.seed == CANONICAL_SEED
+        else "partial"
+    )
     config = {
         "seed": args.seed,
         "roots_per_family": args.roots_per_family,
         "models": args.models,
+        "benchmark_scope": benchmark_scope,
         "python": platform.python_version(),
         "numpy": np.__version__,
+        "scipy": _package_version("scipy"),
+        "scikit_learn": _package_version("scikit-learn"),
+        "numba": _package_version("numba"),
+        "python_hash_seed": os.environ.get("PYTHONHASHSEED", "not-set"),
+        "platform": platform.platform(),
         "family_specs": serializable_specs(),
         "validation_threshold_frozen": True,
+        "winner_selection_policy": [
+            "verdict",
+            "gates_passed",
+            "family_ood_worst_domain_ndcg_at_10",
+            "template_ood_worst_domain_ndcg_at_10",
+            "family_ood_pair_auc",
+            "id_ndcg_at_10",
+            "throughput_texts_per_sec",
+        ],
     }
+    benchmark_start = time.perf_counter()
     results = {model: evaluate_model(model, records, train_pairs, audit) for model in args.models}
+    config["total_benchmark_seconds"] = float(time.perf_counter() - benchmark_start)
     args.output.mkdir(parents=True, exist_ok=True)
     write_report(args.output, results, audit, config)
     print(f"\nWrote {args.output / 'metrics.json'}")

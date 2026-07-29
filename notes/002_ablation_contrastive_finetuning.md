@@ -1,5 +1,7 @@
 # Experiment 002: Ablation - Contrastive Fine-Tuning Impact
 
+> **Historical experiment snapshot.** 이 ablation은 Fisher 내부 비교이며 전체 모델/OOD 순위를 뜻하지 않습니다. 현재 결론은 [`../results/FINAL_REPORT.md`](../results/FINAL_REPORT.md)를 참조하세요.
+
 ## Date
 2025-01-XX (follow-up to Experiment 001)
 

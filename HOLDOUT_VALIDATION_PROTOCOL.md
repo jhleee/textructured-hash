@@ -1,203 +1,138 @@
-# Independent Holdout Validation Protocol
+# Post-Freeze Holdout Validation Protocol
 
-## Motivation
+## 상태
 
-The Fisher Structure Encoder achieves 7/7 success criteria on the **development benchmark**
-(synthetic.jsonl, seed=42, 24 categories, 15,300 texts, 9,992 pairs). However, this benchmark
-was used iteratively during algorithm design — hyperparameters, feature design, and contrastive
-training were all tuned against it. To confirm **out-of-distribution generalization**, we must
-evaluate the frozen algorithm on data it has never influenced.
+최종 전체 synthetic benchmark에서 `GeneralizedStructureEncoder`가 21/21 gate를 통과해 우승했습니다. 그러나 generalized의 label-free branch 구성과 adaptive routing weight는 같은 benchmark를 관찰하며 선택되었습니다. 따라서 현재 결과는 **synthetic benchmark winner**를 결정하기에는 충분하지만 production 승인을 위한 독립 holdout은 아닙니다.
 
-This document defines the protocol for that independent holdout re-validation.
+이 문서는 우승 모델을 freeze한 뒤 수행해야 할 다음 검증을 정의합니다. 저장소의 기존 `generate_holdout_data.py`와 `evaluate_holdout.py`는 Fisher 전용 legacy pair validation이므로 Generalized 최종 승인 근거로 사용하지 않습니다.
 
----
+## 1. 목적
 
-## 1. Design Principles
+다음을 독립적으로 확인합니다.
 
-| Principle | Rationale |
-|-----------|-----------|
-| **Algorithm freeze** | No code, hyperparameter, or threshold changes after holdout generation |
-| **Independent generator** | New seed, new templates, new vocabulary — no overlap with dev data |
-| **Source-family holdout** | Include at least 2 entirely new category families not in the 24 dev categories |
-| **Blind evaluation** | Same metrics pipeline; no per-category inspection until after aggregate pass/fail |
-| **Reproducibility** | Fixed seed (holdout_seed=2024), deterministic pair sampling |
+- 현재 generator/template/family에 과적합되지 않았는가?
+- 완전히 새로운 source family와 renderer에서도 retrieval·routing 성능이 유지되는가?
+- 실제 prevalence와 malformed input에서 abstention/fallback을 보정할 수 있는가?
+- 목표 vector DB를 포함한 end-to-end 비용이 제약을 만족하는가?
 
----
+## 2. Freeze 대상
 
-## 2. Holdout Dataset Specification
+Holdout 데이터 또는 aggregate 결과를 보기 전에 다음을 고정합니다.
 
-### 2.1 Data Independence Guarantees
+- `GeneralizedStructureEncoder` feature extraction 코드
+- Fisher branch 차원과 학습 절차
+- branch weight 및 table/delimiter routing 조건
+- vector 차원, dtype, quantization 방식
+- pair threshold 선택 방식
+- 21개 gate와 우승자 선정 순서
+- dependency lock 또는 실행 환경 manifest
+- git commit SHA와 model checkpoint SHA-256
 
-| Dimension | Development Set | Holdout Set |
-|-----------|----------------|-------------|
-| Generator seed | 42 | 2024 |
-| Template vocabulary | Original (e.g., domains: `example, test, demo…`) | Entirely new vocabulary (e.g., domains: `acme, globex, initech…`) |
-| Category coverage | 24 categories | Same 24 + **4 new unseen families** |
-| Text count | ~15,300 | ~8,000 (lower count to avoid overpowering noise) |
-| Pair count | 9,992 | 6,000 (3,000 pos + 3,000 neg) |
-| Pair seed | 42 | 7777 |
-| Split | 60/20/20 | 100% test (no train/val — model is frozen) |
+Holdout 공개 후 위 항목을 변경하면 해당 데이터는 development set으로 전환되며 새 holdout이 필요합니다.
 
-### 2.2 New Source Families (Unseen Categories)
+## 3. 독립성 요구사항
 
-These categories were **not present** in the development set and test whether the encoder
-generalizes to structural patterns it was never trained on:
+### Generator/source independence
 
-1. **`markdown`** — Markdown-formatted text (headings, lists, bold/italic, links)
-2. **`log_entry`** — Timestamped log lines (syslog, Apache, JSON-structured logs)
-3. **`regex`** — Regular expression patterns of varying complexity
-4. **`ini_config`** — INI/TOML configuration file sections
+- `src/data/real_world_benchmark.py`의 renderer를 import하거나 복사하지 않습니다.
+- 기존 20 family와 다른 source lineage에서 최소 10개 family를 구성합니다.
+- 실제 데이터가 허용되면 비식별·승인된 shadow sample을 우선합니다.
+- 합성 데이터라면 구현자가 아닌 별도 작성자 또는 사전 고정된 외부 fixture가 생성합니다.
+- family·template·root ID를 pair 생성 전에 부여합니다.
 
-### 2.3 Modified Templates for Existing Categories
+### Split independence
 
-For the 24 existing categories, the holdout generator uses:
+- Root 또는 source document 단위로 split합니다.
+- Exact text와 canonicalized text hash overlap을 모두 검사합니다.
+- 최소 한 축은 family 전체 holdout이어야 합니다.
+- Threshold는 holdout test가 아닌 별도 calibration split에서만 선택합니다.
+- 최종 test label은 한 번만 엽니다.
 
-- **Different vocabulary**: new domain names, person names, variable names, etc.
-- **Different format distributions**: shifted probabilities for format variants
-- **Different length distributions**: slightly wider/narrower ranges
-- **Different language content**: new sentence templates for Korean/English/Chinese/Japanese
+### 규모 권장
 
-This ensures that even for known categories, the encoder cannot rely on memorized token patterns.
+- 10개 이상 domain
+- 20개 이상 family
+- family당 50개 이상 latent roots
+- 각 root당 2개 이상 renderer
+- pair class별 2,000개 이상
+- retrieval query 1,000개 이상
+- 실제 prevalence를 반영한 novelty set과 50/50 balanced diagnostic set을 둘 다 보고
 
----
+## 4. 평가 항목
 
-## 3. Frozen Model Definition
+현재 [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md)의 21개 gate를 그대로 적용하고 다음을 추가합니다.
 
-The model under evaluation is **FisherStructureEncoder** with:
+1. Root/domain/family grouped bootstrap 95% CI
+2. Worst-domain 및 worst-family 지표와 표본 수
+3. Calibration threshold의 coverage-risk curve
+4. Abstention 시 human/fallback 경로까지 포함한 utility
+5. 입력 길이·Unicode·malformed format별 오류율
+6. 목표 vector DB에서 index 크기, build time, recall, p50/p95/p99 latency
+7. Cold start와 warm steady-state 처리량
+8. 실제 prevalence에서 novelty precision/recall
 
-- Feature dim: 320 (numba-compiled)
-- Output dim: 256
-- Training: Fisher LDA + 5 epochs contrastive fine-tuning
-- Training data: `data/train.jsonl` (development set, seed=42)
-- Normalization: saved `feature_mean`, `feature_std`
-- Projection: saved `W` matrix
+Hard quality gate는 가능한 경우 point estimate가 아니라 95% CI lower bound로 판정합니다.
 
-The model is loaded from a saved `.npz` checkpoint. **No retraining is performed.**
+## 5. 판정
 
----
+| Outcome | 조건 | 해석 |
+|---|---|---|
+| `HOLDOUT_PASS` | Reliability/efficiency hard gate와 사전 등록된 quality CI gate 모두 통과 | 제한된 shadow pilot 후보 |
+| `HOLDOUT_LIMITED` | Known-format use case는 통과하지만 template/family OOD gate 일부 실패 | 명시한 범위에서 human-assisted 사용만 고려 |
+| `HOLDOUT_FAIL` | Reliability 실패, 핵심 OOD 품질 실패 또는 CI가 기준 미달 | 재설계 후 새로운 holdout 필요 |
 
-## 4. Evaluation Protocol
+`HOLDOUT_PASS`도 자동 production 승인을 의미하지 않습니다. 실제 shadow traffic, privacy/security review, 운영 rollback 계획이 별도로 필요합니다.
 
-### 4.1 Steps
+## 6. 결과 보고 계약
+
+최종 보고서는 최소한 다음을 포함해야 합니다.
+
+- freeze commit/checkpoint/environment hash
+- dataset provenance와 승인 정보
+- split 및 leakage audit
+- 사전 등록 gate와 실제 결과
+- aggregate, grouped CI, worst-group 결과
+- calibration/abstention 정책
+- known limitation과 실패 사례
+- holdout 공개 후 변경 여부
+
+실패 사례를 보고 feature나 routing을 수정한 경우, 수정된 모델은 같은 holdout 결과를 최종 점수로 재사용하지 않습니다.
+
+## 7. 현재 저장소의 legacy Fisher holdout
+
+다음 명령은 과거 Fisher encoder의 24 known + 4 new category pair 진단을 재현합니다.
 
 ```bash
-# 1. Freeze: save the trained model (if not already saved)
 python scripts/evaluate_holdout.py --phase save_model \
-    --train data/train.jsonl \
-    --model_path results/holdout_validation/frozen_model.npz
+  --train data/train.jsonl \
+  --model_path results/holdout_validation/frozen_model.npz
 
-# 2. Generate: create independent holdout data
 python scripts/generate_holdout_data.py \
-    --output data/holdout/ \
-    --seed 2024 \
-    --pair_seed 7777 \
-    --n_positive 3000 \
-    --n_negative 3000
+  --output data/holdout \
+  --seed 2024 \
+  --pair_seed 7777 \
+  --n_positive 3000 \
+  --n_negative 3000
 
-# 3. Evaluate: run frozen model on holdout
 python scripts/evaluate_holdout.py --phase evaluate \
-    --model_path results/holdout_validation/frozen_model.npz \
-    --holdout_pairs data/holdout/pairs.jsonl \
-    --output results/holdout_validation/
+  --model_path results/holdout_validation/frozen_model.npz \
+  --holdout_pairs data/holdout/pairs.jsonl \
+  --output results/holdout_validation
 ```
 
-### 4.2 Metrics (identical to dev benchmark)
+이 경로의 제한은 다음과 같습니다.
 
-| Metric | Target | Pass Condition |
-|--------|--------|----------------|
-| AUC-ROC | ≥ 0.92 | Hard requirement |
-| Separation | ≥ 2.5 | Hard requirement |
-| Best F1 | ≥ 0.88 | Hard requirement |
-| Mean Positive Sim | ≥ 0.85 | Hard requirement |
-| Mean Negative Sim | ≤ 0.35 | Hard requirement |
-| Encoding Speed | ≥ 10,000/s | Hard requirement |
-| Vector Bytes (int8) | ≤ 256 | Hard requirement |
+- `evaluate_holdout.py`가 `FisherStructureEncoder`만 load합니다.
+- pair-only 평가이며 retrieval·clustering·triage를 포함하지 않습니다.
+- `evaluate()`가 holdout에서 best F1 threshold를 찾습니다.
+- intra-family group에는 단일 class만 있어 “new families AUC”를 직접 계산할 수 없습니다.
+- `SOFT PASS` 구현은 new-family AUC 대신 positive mean similarity를 사용합니다.
 
-### 4.3 Additional Analyses
+따라서 이 결과는 Fisher regression diagnostic일 뿐, 현재 Generalized 우승자를 뒤집거나 승인하는 근거가 아닙니다.
 
-After aggregate pass/fail is determined:
+## 8. 현재 결론
 
-1. **Per-category-family breakdown**: How does performance differ between
-   "known 24" categories and "new 4" families?
-2. **Cross-family pairs**: Accuracy on pairs where one text is from a known
-   category and the other is from a new family.
-3. **Hardest pairs**: Bottom-10 worst predictions — manual inspection.
-4. **Confidence interval**: Bootstrap 95% CI on AUC-ROC (1000 resamples).
-
----
-
-## 5. Pass/Fail Criteria
-
-| Outcome | Definition |
-|---------|------------|
-| **FULL PASS** | All 7 metrics meet targets on the holdout set |
-| **SOFT PASS** | ≥5/7 metrics pass AND AUC-ROC ≥ 0.92 AND new families AUC ≥ 0.85 |
-| **FAIL** | AUC-ROC < 0.92 OR ≥3 metrics fail |
-
-### Interpretation
-
-- **FULL PASS** → Algorithm generalizes; ready for production evaluation.
-- **SOFT PASS** → Investigate specific failure modes; may need targeted improvement for new families.
-- **FAIL** → Overfitting to development set; requires redesign or regularization.
-
----
-
-## 6. Reporting Template
-
-```markdown
-# Holdout Validation Results
-
-## Summary
-- Date: YYYY-MM-DD
-- Model: FisherStructureEncoder (frozen from dev training)
-- Holdout size: X texts, Y pairs
-- Result: [FULL PASS / SOFT PASS / FAIL]
-
-## Aggregate Metrics
-
-| Metric | Target | Holdout | Dev Benchmark | Delta |
-|--------|--------|---------|---------------|-------|
-| AUC-ROC | ≥0.92 | X.XXXX | 0.9977 | -X.XX% |
-| ... | ... | ... | ... | ... |
-
-## Per-Family Breakdown
-
-| Family | Pairs | AUC-ROC | Mean Sim (pos) | Mean Sim (neg) |
-|--------|-------|---------|----------------|----------------|
-| Known 24 (intra) | ... | ... | ... | ... |
-| New families (intra) | ... | ... | ... | ... |
-| Cross-family | ... | ... | ... | ... |
-
-## Failure Analysis
-[If applicable]
-
-## Conclusion
-[Statement on generalization]
-```
-
----
-
-## 7. Timeline & Dependencies
-
-| Step | Dependency | Estimated Time |
-|------|------------|----------------|
-| Freeze model checkpoint | Existing train pipeline | 1 min |
-| Implement holdout generator | None (independent) | New script |
-| Generate holdout data | Generator script | ~10 sec |
-| Run evaluation | Frozen model + holdout data | ~30 sec |
-| Write report | Evaluation results | Manual |
-
----
-
-## 8. Risk Mitigation
-
-| Risk | Mitigation |
-|------|------------|
-| Holdout generator accidentally shares templates | Code review: no imports from `src/data/generator.py` |
-| Model checkpoint incompatible | Test save/load round-trip before holdout generation |
-| New category features OOD for normalization | Feature normalization is per-dimension; new patterns still produce bounded features |
-| Contrastive training overfit to 24-category structure | This is exactly what holdout validation detects |
-
----
-
-**End of Protocol**
+- Repository-wide synthetic benchmark winner: **GeneralizedStructureEncoder**
+- Synthetic verdict: **SYNTHETIC_GO, 21/21**
+- Post-freeze independent holdout: **아직 수행되지 않음**
+- Production status: **미승인; bounded shadow pilot 이전 단계**
